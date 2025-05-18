@@ -39,10 +39,10 @@ if (${TARGET_ARCH} STREQUAL "sophgo_pcie")
     include_directories(../../framework/sophgo_framework/include)
     include_directories(../../framework/utils/include)
 
-
+    include_directories(../../3rdparty/argparse-3.2/include)
 
     add_executable(detect.sophgo_pcie detect.cpp)
-    target_link_libraries(detect.sophgo_pcie -ldetect -lsophgo_framework -lutils)
+    target_link_libraries(detect.sophgo_pcie ${OpenCV_LIBS} -ldetect -lsophgo_framework -lutils)
 
 
 

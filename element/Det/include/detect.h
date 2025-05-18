@@ -11,6 +11,8 @@ public:
     virtual ~detect() = default;
 
     virtual std::vector<detectBoxes> process(void* inputImage, int num) = 0;
+
+    virtual algorithmInfo getAlgorithmInfo() = 0;
     virtual void printAlgorithmInfo() = 0;
     virtual stateType resetAnchor(std::vector<std::vector<std::vector<int>>>) = 0;
 

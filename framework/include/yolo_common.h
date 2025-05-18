@@ -3,12 +3,30 @@
 #include <string>
 #include <vector>
 
+
 // yolo config
-enum class yoloType {
+enum struct yoloType {
     YOLOV5,
     YOLOV6,
     YOLOV7,
     YOLOV8
+};
+
+enum class algorithmType {
+    DETECT,
+    SEGMENTATION,
+    LANDMARK,
+    CLASSIFICATION,
+    POSE_ESTIMATION,
+    UNKNOWN
+};
+
+enum class deviceType {
+    SOPHGO,
+    NVIDIA,
+    RKNN,
+    JETSON,
+    CPU
 };
 
 enum class resizeType {
@@ -29,6 +47,16 @@ struct YOLOConfig {
                                                           {{116, 90}, {156, 198}, {373, 326}}};
 };
 
+struct algorithmInfo {
+    yoloType yolo_type;
+    algorithmType algorithm_type;
+    deviceType device_type;
+    std::vector<std::vector<int>> input_shape;
+    std::vector<std::vector<int>> output_shape;
+    int batch_size;
+};
+
+
 // transform config
 inline YOLOConfig getYOLOConfig(yoloType type) {
     YOLOConfig config;
@@ -47,13 +75,7 @@ enum class stateType {
     ERROR = 5001
 };
 
-enum class deviceType {
-    SOPHGO,
-    NVIDIA,
-    RKNN,
-    JETSON,
-    CPU
-};
+
 
 struct detectBox {
     // 左上角坐标
@@ -75,6 +97,18 @@ struct detectBox {
     std::string className="";
 };
 using detectBoxes = std::vector<detectBox>;
+
+
+// 输出的数据格式
+typedef enum INPUTTYPE{
+    JPG_IMAGE,
+    IMAGE,
+    IMAGE_DIR,
+    VIDEO,
+    RTSP_OR_RTMP,
+    DEVICE,
+    UNKNOW
+};
 
 // 不能拷贝的类
 class NoCopyable {

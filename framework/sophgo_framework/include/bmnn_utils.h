@@ -175,6 +175,14 @@ class BMNNTensor{
     return &m_tensor->shape;
   }
 
+  std::vector<int> get_shape_vector() {
+    std::vector<int> shape;
+    for(int i=0; i<m_tensor->shape.num_dims; i++){
+      shape.push_back(m_tensor->shape.dims[i]);
+    }
+    return shape;
+  }
+
   bm_data_type_t get_dtype() {
     return m_tensor->dtype;
   }
@@ -293,6 +301,10 @@ class BMNNNetwork : public NoCopyable {
       }
       assert(0);
       return m_max_batch;
+  }
+
+  int inputTensorNum() {
+    return m_netinfo->input_num;
   }
 
   std::shared_ptr<BMNNTensor> inputTensor(int index, int stage_idx=-1){

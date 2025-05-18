@@ -1,7 +1,7 @@
 #include <fstream>
 #include <cmath>
-#include <unistd.h>
-#include <sys/stat.h>
+#include <algorithm>
+#include <dirent.h>
 
 #include "utils.h"
 #include "opencv2/opencv.hpp"
@@ -108,13 +108,13 @@ void getAspectParam(int src_w, int src_h, int dst_w, int dst_h,
 
 // draw functions only for debug
 // 绘制检测框
-void drawBox(detectBoxes& boxes, const std::string& inputPath, std::string outputPath = "") {
+void drawBox(detectBoxes& boxes, cv::Mat& img, std::string outputName, std::string outputDirPath = "./detect_result") {
     // 读取图片
-    cv::Mat img = cv::imread(inputPath);
-    if (img.empty()) {
-        std::cerr << "无法读取图片: " << inputPath << std::endl;
-        return;
-    }
+    // cv::Mat img = cv::imread(inputPath);
+    // if (img.empty()) {
+    //     std::cerr << "无法读取图片: " << inputPath << std::endl;
+    //     return;
+    // }
 
     // 遍历所有检测框
     for (const auto& box : boxes) {
@@ -141,12 +141,11 @@ void drawBox(detectBoxes& boxes, const std::string& inputPath, std::string outpu
                     cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0), 1);
     }
 
-    // 保存或显示图片
-    if (outputPath.empty()) {
-        if (access("./detect_result", 0) != F_OK)
-            mkdir("./detect_result", S_IRWXU);
-        outputPath = "./detect_result/" + inputPath.substr(inputPath.find_last_of("/") + 1);
-    }
+    // 保存或显示图片    
+    if (access(outputDirPath.c_str(), 0) != F_OK)
+        mkdir(outputDirPath.c_str(), S_IRWXU);
+    auto outputPath = outputDirPath + "/" + outputName;
+
     if (!cv::imwrite(outputPath, img)) {
         std::cerr << "无法保存图片到: " << outputPath << std::endl;
     }
@@ -154,7 +153,7 @@ void drawBox(detectBoxes& boxes, const std::string& inputPath, std::string outpu
 }
 
 // json functions
-void box2json(std::string imgPath, detectBoxes& boxes, nlohmann::ordered_json& jsonObj){
+void box2json(const std::string imgPath, const detectBoxes& boxes, nlohmann::ordered_json& jsonObj){
     jsonObj["image_path"] = imgPath;
     jsonObj["boxes"] = nlohmann::ordered_json::array();
     for (const auto& box : boxes) {
@@ -171,8 +170,102 @@ void box2json(std::string imgPath, detectBoxes& boxes, nlohmann::ordered_json& j
     }
 }
 
+void boxVec2json(const std::vector<std::string>& imgPath, const std::vector<detectBoxes>& boxes, std::vector<nlohmann::ordered_json>& jsonObj) {
+    auto num = imgPath.size();
+    
+    for (int i = 0; i < num; ++i) {
+        box2json(imgPath[i], boxes[i], jsonObj[i]);
+    }
+}
+
 void jsonDump(std::string jsonPath, nlohmann::ordered_json& jsonObj){
     std::ofstream ofs(jsonPath);
     ofs << jsonObj.dump(4);
     ofs.close();
+}
+
+// other functions
+void isFileExist(const std::string& filePath) {
+    struct stat buffer;
+    if (stat(filePath.c_str(), &buffer) != 0){
+        std::cerr << "File does not exist: " << filePath << std::endl;
+        exit(-1);
+    };
+}
+
+bool startsWith(const std::string& str, const std::string& prefix) {
+    if (str.length() < prefix.length()) return false;
+    return str.compare(0, prefix.length(), prefix) == 0;
+}
+
+std::string getFileName(const std::string& path) {
+    // 查找最后一个路径分隔符
+    size_t last_slash = path.find_last_of("/\\");
+    std::string filename = (last_slash != std::string::npos) ? 
+                          path.substr(last_slash + 1) : path;
+
+    // 查找最后一个点号
+    size_t last_dot = filename.find_last_of('.');
+    if (last_dot != std::string::npos) {
+        return filename.substr(0, last_dot);
+    }
+    return filename; // 没有扩展名的情况
+}
+
+bool endsWithCaseInsensitive(const std::string& str, const std::string& suffix) {
+    if (str.length() < suffix.length()) return false;
+    std::string str_suffix = str.substr(str.length() - suffix.length());
+    std::transform(str_suffix.begin(), str_suffix.end(), str_suffix.begin(), ::tolower);
+    std::string lower_suffix = suffix;
+    std::transform(lower_suffix.begin(), lower_suffix.end(), lower_suffix.begin(), ::tolower);
+    return str_suffix == lower_suffix;
+}
+
+INPUTTYPE classifyInput(const std::string& str) {
+    // 类型1: rtsp:// 或 rtmp:// 开头
+    if (startsWith(str, "rtsp://") || startsWith(str, "rtmp://")) {
+        return INPUTTYPE::RTSP_OR_RTMP;
+    }
+    // 类型2: /dev/ 开头
+    if (startsWith(str, "/dev/")) {
+        return INPUTTYPE::DEVICE;
+    }
+    // 类型3: .jpg 结尾（不区分大小写）
+    if (endsWithCaseInsensitive(str, ".jpg")) {
+        return INPUTTYPE::JPG_IMAGE;
+    }
+    // 类型4: 视频扩展名（常见格式）
+    std::vector<std::string> video_extensions = {".avi", ".mp4", ".mkv", ".mov", ".wmv", ".flv", ".m4v", ".3gp",".h264", ".h265"};
+    for (const auto& ext : video_extensions) {
+        if (endsWithCaseInsensitive(str, ext)) {
+            return INPUTTYPE::VIDEO;
+        }
+    }
+
+    // 类型4: 图片文件夹
+    struct stat info;
+    if (!stat(str.c_str(), &info) && info.st_mode & S_IFDIR) {
+        return INPUTTYPE::IMAGE_DIR;
+    }
+    // 类型5: 其他不支持的类型
+    return INPUTTYPE::UNKNOW;
+}
+
+std::vector<std::string> getJpgFiles(const std::string& dirPath) {
+    std::vector<std::string> jpgFiles;
+    DIR* dir = opendir(dirPath.c_str());
+    if (dir == nullptr) {
+        std::cerr << "无法打开目录: " << dirPath << std::endl;
+        return jpgFiles;
+    }
+
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != nullptr) {
+        std::string fileName(entry->d_name);
+        if (endsWithCaseInsensitive(fileName, ".jpg")) {
+            jpgFiles.push_back(dirPath + "/" + fileName);
+        }
+    }
+    closedir(dir);
+    return jpgFiles;
 }

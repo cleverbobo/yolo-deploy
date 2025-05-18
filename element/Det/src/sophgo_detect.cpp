@@ -56,8 +56,23 @@ sophgo_detect::sophgo_detect(std::string modelPath, yoloType type, int devId) {
         auto ret = bm_image_create(h, m_net_h, m_net_w, image_format, data_formate, &image);
     }
 
-
-
+    // init m_algorithmInfo
+    std::vector<std::vector<int>> input_shape;
+    for (int i = 0; i < m_bmNetwork -> inputTensorNum(); ++i) {
+        auto input_tensor = m_bmNetwork->inputTensor(i);
+        input_shape.push_back(input_tensor->get_shape_vector());
+    }
+    std::vector<std::vector<int>> output_shape;
+    for (int i = 0; i < m_bmNetwork -> outputTensorNum(); ++i) {
+        auto output_tensor = m_bmNetwork->outputTensor(i);
+        output_shape.push_back(output_tensor->get_shape_vector());
+    }
+    m_algorithmInfo = algorithmInfo{ m_yoloType,
+                                     algorithmType::DETECT,
+                                     deviceType::SOPHGO,
+                                     input_shape,
+                                     output_shape,
+                                     m_max_batch };
 }
 
 sophgo_detect::~sophgo_detect() {
@@ -70,23 +85,35 @@ std::vector<detectBoxes> sophgo_detect::process(void* inputImage, int num) {
     bm_image* imageData = reinterpret_cast<bm_image*>(inputImage);
 
     stateType ret = stateType::SUCCESS;
-
-    // preprocess
-    ret = preProcess(imageData, num);
-
-    // inference
-    ret = inference();
-
-    // postprocess
+    int calculateTime = (num-1) / m_max_batch + 1;
     std::vector<detectBoxes> outputBoxes;
-    ret = postProcess(imageData, outputBoxes, num);
+
+    for (int i = 0; i < calculateTime; ++i) {
+        int inputNum = std::min(num - i * m_max_batch, m_max_batch);
+
+        // preprocess
+        ret = preProcess(imageData + m_max_batch*i, inputNum);
+
+        // inference
+        ret = inference();
+
+        // postprocess
+        ret = postProcess(imageData + m_max_batch*i, outputBoxes, inputNum);
+    }
+
 
     return outputBoxes;
 }
 
+algorithmInfo sophgo_detect::getAlgorithmInfo() {
+   return m_algorithmInfo;
+}
+
 void sophgo_detect::printAlgorithmInfo() {
-    std::cout << "Algorithm: " << int(m_yoloType) << std::endl;
+    std ::cout << "\n---------------------------AlgorithmInfo----------------------------" << std::endl;
+    std::cout << "YOLO Type: " << int(m_yoloType) << std::endl;
     std::cout << "Device ID: " << m_devId << std::endl;
+    std ::cout << "---------------------------AlgorithmInfo----------------------------\n" << std::endl;
 }
 
 stateType sophgo_detect::resetAnchor(std::vector<std::vector<std::vector<int>>> anchors) {
@@ -117,7 +144,7 @@ stateType sophgo_detect::preProcess(bm_image* inputImages, int num){
     }
 
     auto ret = bmcv_image_vpp_convert_padding(handle, num, *inputImages, m_preprocess_images.data(),
-                                              padding_attrs.data(), crop_rects.data(),BMCV_INTER_LINEAR);
+                                              padding_attrs.data(), NULL ,BMCV_INTER_LINEAR);
 
     // attach to tensor
     bm_device_mem_t input_dev_mem;
@@ -147,32 +174,32 @@ stateType sophgo_detect::postProcess(bm_image* inputImages, std::vector<detectBo
     
 }
 
-stateType sophgo_detect::resizeBox(bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, int num){
-    for (int i = 0; i < num; i++) {
-        bm_image img = *(inputImages + i);
-        int img_w = img.width;
-        int img_h = img.height;
+stateType sophgo_detect::resizeBox(bm_image* inputImage, detectBoxes& outputBoxes){
 
-        int dx, dy;
-        float scale_x, scale_y;
-        getAspectParam(img_w, img_h, m_net_w, m_net_h, dx, dy, scale_x, scale_y, m_resizeType);
-        for (auto& box : outputBoxes[i]) {
-            box.left = (box.left - dx) / scale_x;
-            box.top = (box.top - dy) / scale_y;
-            box.right = (box.right - dx) / scale_x;
-            box.bottom = (box.bottom - dy) / scale_y;
+    bm_image img = *inputImage;
+    int img_w = img.width;
+    int img_h = img.height;
 
-            // clip
-            box.left = std::min(std::max(box.left, 0), img_w);
-            box.top = std::min(std::max(box.top, 0), img_h);
-            box.right = std::min(std::max(box.right, 0), img_w);
-            box.bottom = std::min(std::max(box.bottom, 0), img_h);
+    int dx, dy;
+    float scale_x, scale_y;
+    getAspectParam(img_w, img_h, m_net_w, m_net_h, dx, dy, scale_x, scale_y, m_resizeType);
+    for (auto& box : outputBoxes) {
+        box.left = (box.left - dx) / scale_x;
+        box.top = (box.top - dy) / scale_y;
+        box.right = (box.right - dx) / scale_x;
+        box.bottom = (box.bottom - dy) / scale_y;
 
-            // update w,h
-            box.width = box.right - box.left;
-            box.height = box.bottom - box.top;
-        }
+        // clip
+        box.left = std::min(std::max(box.left, 0), img_w);
+        box.top = std::min(std::max(box.top, 0), img_h);
+        box.right = std::min(std::max(box.right, 0), img_w);
+        box.bottom = std::min(std::max(box.bottom, 0), img_h);
+
+        // update w,h
+        box.width = box.right - box.left;
+        box.height = box.bottom - box.top;
     }
+    
 }
 
 stateType sophgo_detect::yolov5Post(bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, int num){
@@ -337,7 +364,7 @@ stateType sophgo_detect::yolov5Post(bm_image* inputImages, std::vector<detectBox
               box.bottom -= box.classId * max_wh;
           }
       }
-  
+      resizeBox(inputImages+batch_idx, resVec);
       outputBoxes.push_back(resVec);
     }
     return stateType::SUCCESS;

@@ -1,8 +1,14 @@
 #pragma once
 #include <vector>
+#include <unistd.h>
+#include <sys/stat.h>
 
 #include "yolo_common.h"
 #include "json.hpp"
+
+namespace cv {
+    class Mat;
+}
 
 // math functions
 float sigmoid(float x);
@@ -14,13 +20,20 @@ void getAspectParam(int src_w, int src_h, int dst_w, int dst_h,
 
 
 // draw functions only for debug
-void drawBox(detectBoxes& boxes, const std::string& inputPath,std::string outputPath = "");
+void drawBox(detectBoxes& boxes, cv::Mat& img, std::string outputName, std::string outputDirPath = "./detect_result");
 // void drawSegmentation();
 // void drawLandmark();
 
 // json functions
-void box2json(std::string imgPath, detectBoxes& boxes, nlohmann::ordered_json& jsonObj);
+void box2json(const std::string imgPath, const detectBoxes& boxes, nlohmann::ordered_json& jsonObj);
+void boxVec2json(const std::string imgPath, const detectBoxes& boxes, nlohmann::ordered_json& jsonObj);
 // void segmentation2json();
 // void landmark2json();
 void jsonDump(std::string jsonPath, nlohmann::ordered_json& jsonObj);
 
+// other function
+void isFileExist(const std::string& filePath);
+std::string getFileName(const std::string& path);
+
+INPUTTYPE classifyInput(const std::string& str);
+std::vector<std::string> getJpgFiles(const std::string& dirPath);

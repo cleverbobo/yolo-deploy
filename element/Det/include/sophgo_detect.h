@@ -15,6 +15,7 @@ class sophgo_detect : public detect {
         ~sophgo_detect() override;
     
         std::vector<detectBoxes> process(void* inputImage, int num) override;
+        algorithmInfo getAlgorithmInfo() override;
         void printAlgorithmInfo() override;
         stateType resetAnchor(std::vector<std::vector<std::vector<int>>>) override;
     
@@ -24,6 +25,7 @@ class sophgo_detect : public detect {
         std::shared_ptr<BMNNNetwork> m_bmNetwork;
         std::vector<bm_image> m_preprocess_images;
         std::shared_ptr<BMNNHandle> m_handle;
+        algorithmInfo m_algorithmInfo;
         int m_devId = 0;
         yoloType m_yoloType;
 
@@ -52,7 +54,7 @@ class sophgo_detect : public detect {
         stateType inference();
         stateType postProcess(bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, int num);
         
-        stateType resizeBox(bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, int num);
+        stateType resizeBox(bm_image* inputImages, detectBoxes& outputBoxes);
         stateType yolov5Post(bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, int num);
     };
     
