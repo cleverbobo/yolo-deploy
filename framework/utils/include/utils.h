@@ -25,11 +25,12 @@ void drawBox(detectBoxes& boxes, cv::Mat& img, std::string outputName, std::stri
 // void drawLandmark();
 
 // json functions
-void box2json(const std::string imgPath, const detectBoxes& boxes, nlohmann::ordered_json& jsonObj);
+nlohmann::ordered_json box2json(const std::string imgPath, const detectBoxes& boxes);
 void boxVec2json(const std::string imgPath, const detectBoxes& boxes, nlohmann::ordered_json& jsonObj);
 // void segmentation2json();
 // void landmark2json();
 void jsonDump(std::string jsonPath, nlohmann::ordered_json& jsonObj);
+void jsonDump(std::string jsonPath, std::vector<nlohmann::ordered_json>& jsonObjVec);
 
 // other function
 void isFileExist(const std::string& filePath);

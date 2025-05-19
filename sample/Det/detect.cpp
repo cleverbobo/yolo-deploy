@@ -52,17 +52,19 @@ int main(int argc, char** argv) {
 
 
     decoder dec(0);
-    nlohmann::ordered_json resBoxJson;
+    std::vector<nlohmann::ordered_json> resBoxJsonVec;
     switch (inputType) {
         case INPUTTYPE::JPG_IMAGE: {
+
             bm_image img = dec.decodeJpg(inputFile);
             auto resBox = detect->process(&img, 1);
-            box2json(inputFile, resBox[0], resBoxJson);
+            resBoxJsonVec.push_back(box2json(inputFile, resBox[0])) ;
 
             cv::Mat imgMat;
             cv::bmcv::toMAT(&img, imgMat);
             std::string outputName = inputFile.substr(inputFile.find_last_of("/") + 1);
             drawBox(resBox[0], imgMat, outputName, outputDir);
+            bm_image_destroy(img);
             break;
         }
             
@@ -81,7 +83,7 @@ int main(int argc, char** argv) {
                 }
                 auto resBox = detect->process(images.data(), inputNum);
                 for(int j = 0; j < inputNum; j++){
-                    box2json(jpgFiles[i*batch_size+j], resBox[j], resBoxJson);
+                    resBoxJsonVec.push_back(box2json(jpgFiles[i*batch_size+j], resBox[j]));
 
                     cv::Mat imgMat;
                     cv::bmcv::toMAT(&images[j], imgMat);
@@ -117,7 +119,7 @@ int main(int argc, char** argv) {
                 
                 auto resBox = detect->process(imgVec.data(), count);
                 for (int i = 0; i < count; ++i) {
-                    box2json(inputFile, resBox[i], resBoxJson);
+                    resBoxJsonVec.push_back(box2json(inputFile, resBox[i]));
                     cv::Mat imgMat;
                     cv::bmcv::toMAT(&imgVec[i], imgMat);
                     // debug
@@ -142,6 +144,6 @@ int main(int argc, char** argv) {
     }
 
     // dumpData
-    jsonDump("./detectRes.json",resBoxJson);
+    jsonDump("./detectRes.json",resBoxJsonVec);
     return 0;
 }

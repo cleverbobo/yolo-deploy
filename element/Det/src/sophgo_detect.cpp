@@ -55,6 +55,7 @@ sophgo_detect::sophgo_detect(std::string modelPath, yoloType type, int devId) {
     for (auto& image : m_preprocess_images) {
         auto ret = bm_image_create(h, m_net_h, m_net_w, image_format, data_formate, &image);
     }
+    bm_image_alloc_contiguous_mem(m_max_batch, m_preprocess_images.data());
 
     // init m_algorithmInfo
     std::vector<std::vector<int>> input_shape;
@@ -76,6 +77,7 @@ sophgo_detect::sophgo_detect(std::string modelPath, yoloType type, int devId) {
 }
 
 sophgo_detect::~sophgo_detect() {
+    bm_image_free_contiguous_mem(m_max_batch, m_preprocess_images.data());
     for (auto& image : m_preprocess_images) {
         auto ret = bm_image_destroy(image);
     }
@@ -139,18 +141,24 @@ stateType sophgo_detect::preProcess(bm_image* inputImages, int num){
         padding_attrs[i].dst_crop_sty = dy;
         padding_attrs[i].dst_crop_w = img.width * scale_x;
         padding_attrs[i].dst_crop_h = img.height * scale_y;
+        padding_attrs[i].padding_b = m_padValue;
+        padding_attrs[i].padding_g = m_padValue;
+        padding_attrs[i].padding_r = m_padValue;
+        padding_attrs[i].if_memset = true;
 
         crop_rects[i] = {0,0,img_w,img_h};
-    }
 
-    auto ret = bmcv_image_vpp_convert_padding(handle, num, *inputImages, m_preprocess_images.data(),
-                                              padding_attrs.data(), NULL ,BMCV_INTER_LINEAR);
+    }
+    auto ret = bmcv_image_vpp_basic(handle, num, inputImages, m_preprocess_images.data(),
+                                    NULL, NULL, padding_attrs.data(), BMCV_INTER_LINEAR);
 
     // attach to tensor
     bm_device_mem_t input_dev_mem;
+    num = num != m_max_batch ? m_max_batch : num;
     bm_image_get_contiguous_device_mem(num, m_preprocess_images.data(), &input_dev_mem);
     std::shared_ptr<BMNNTensor> input_tensor = m_bmNetwork->inputTensor(0);
     input_tensor->set_device_mem(&input_dev_mem);
+    // input_tensor->set_shape_by_dim(0, num);
     return stateType::SUCCESS;
 }
 

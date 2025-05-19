@@ -153,7 +153,8 @@ void drawBox(detectBoxes& boxes, cv::Mat& img, std::string outputName, std::stri
 }
 
 // json functions
-void box2json(const std::string imgPath, const detectBoxes& boxes, nlohmann::ordered_json& jsonObj){
+nlohmann::ordered_json box2json(const std::string imgPath, const detectBoxes& boxes){
+    nlohmann::ordered_json jsonObj;
     jsonObj["image_path"] = imgPath;
     jsonObj["boxes"] = nlohmann::ordered_json::array();
     for (const auto& box : boxes) {
@@ -168,19 +169,26 @@ void box2json(const std::string imgPath, const detectBoxes& boxes, nlohmann::ord
         boxJson["classId"] = box.classId;
         jsonObj["boxes"].push_back(boxJson);
     }
+    return jsonObj;
 }
 
 void boxVec2json(const std::vector<std::string>& imgPath, const std::vector<detectBoxes>& boxes, std::vector<nlohmann::ordered_json>& jsonObj) {
     auto num = imgPath.size();
     
     for (int i = 0; i < num; ++i) {
-        box2json(imgPath[i], boxes[i], jsonObj[i]);
+        jsonObj.push_back(box2json(imgPath[i], boxes[i]));
     }
 }
 
 void jsonDump(std::string jsonPath, nlohmann::ordered_json& jsonObj){
     std::ofstream ofs(jsonPath);
     ofs << jsonObj.dump(4);
+    ofs.close();
+}
+
+void jsonDump(std::string jsonPath, std::vector<nlohmann::ordered_json>& jsonObjVec){
+    std::ofstream ofs(jsonPath);
+    ofs << std::setw(4) << jsonObjVec;
     ofs.close();
 }
 
