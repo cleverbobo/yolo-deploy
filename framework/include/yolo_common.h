@@ -2,7 +2,30 @@
 
 #include <string>
 #include <vector>
+#include <sstream>
 
+#include "log.hpp"
+
+#define YOLO_LIKELY(expr) (__builtin_expect(static_cast<bool>(expr), 1))
+#define YOLO_UNLIKELY(expr) (__builtin_expect(static_cast<bool>(expr), 0))
+
+inline std::string concatArgs() { return ""; }
+
+template <typename T, typename... Args>
+inline std::string concatArgs(const T& arg, const Args&... args) {
+  std::stringstream ss;
+  ss << std::string(arg);
+  return ss.str() + concatArgs(args...);
+}
+
+#define YOLO_CHECK(cond, ...)                                               \
+  if (YOLO_UNLIKELY(!(cond))) {                                             \
+    std::string msg = concatArgs(__VA_ARGS__);                                \
+    std::string error_msg =                                                   \
+        "Expected [ " #cond " ] to be true, but got false. The reason is [ " + (msg) +" ]";             \
+    YOLO_CRITICAL("YOLO_CHECK failed: {}", error_msg);                        \
+    exit(1);                                                                  \
+  }
 
 // yolo config
 enum struct yoloType {
@@ -100,7 +123,7 @@ using detectBoxes = std::vector<detectBox>;
 
 
 // 输出的数据格式
-typedef enum INPUTTYPE{
+enum class INPUTTYPE{
     JPG_IMAGE,
     IMAGE,
     IMAGE_DIR,
