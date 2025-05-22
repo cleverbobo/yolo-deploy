@@ -138,7 +138,7 @@ int main(int argc, char** argv) {
             
         
         default:
-            std::cerr << "Input type is not supported!" << std::endl;
+            YOLO_ERROR("Input type is not supported!");
             return -1;
             
     }

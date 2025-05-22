@@ -95,7 +95,9 @@ inline YOLOConfig getYOLOConfig(yoloType type) {
 enum class stateType {
 
     SUCCESS = 0,
-    ERROR = 5001
+    ERROR = 5001,
+    INFERENCE_ERROR,
+    UNMATCH_YOLO_TYPE_ERROR
 };
 
 

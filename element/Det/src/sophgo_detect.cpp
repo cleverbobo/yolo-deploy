@@ -55,7 +55,8 @@ sophgo_detect::sophgo_detect(std::string modelPath, yoloType type, int devId) {
     for (auto& image : m_preprocess_images) {
         auto ret = bm_image_create(h, m_net_h, m_net_w, image_format, data_formate, &image);
     }
-    bm_image_alloc_contiguous_mem(m_max_batch, m_preprocess_images.data());
+    auto ret = bm_image_alloc_contiguous_mem(m_max_batch, m_preprocess_images.data());
+    YOLO_CHECK(ret == BM_SUCCESS, "bm_image_alloc_contiguous_mem failed in sophgo_detect::sophgo_detect!");
 
     // init m_algorithmInfo
     std::vector<std::vector<int>> input_shape;
@@ -95,14 +96,17 @@ std::vector<detectBoxes> sophgo_detect::process(void* inputImage, int num) {
 
         // preprocess
         ret = preProcess(imageData + m_max_batch*i, inputNum);
+        YOLO_CHECK(ret == stateType::SUCCESS, "preProcess failed in sophgo_detect::process")
 
         // inference
         ret = inference();
+        YOLO_CHECK(ret == stateType::SUCCESS, "inference failed in sophgo_detect::process")
 
         // postprocess
         ret = postProcess(imageData + m_max_batch*i, outputBoxes, inputNum);
-    }
+        YOLO_CHECK(ret == stateType::SUCCESS, "postProcess failed inf sophgo_detect::process")
 
+    }
 
     return outputBoxes;
 }
@@ -151,6 +155,7 @@ stateType sophgo_detect::preProcess(bm_image* inputImages, int num){
     }
     auto ret = bmcv_image_vpp_basic(handle, num, inputImages, m_preprocess_images.data(),
                                     NULL, NULL, padding_attrs.data(), BMCV_INTER_LINEAR);
+    YOLO_CHECK(ret == BM_SUCCESS, "bmcv_image_vpp_basic failed in sophgo_detect::preProcess");
 
     // attach to tensor
     bm_device_mem_t input_dev_mem;
@@ -158,13 +163,12 @@ stateType sophgo_detect::preProcess(bm_image* inputImages, int num){
     bm_image_get_contiguous_device_mem(num, m_preprocess_images.data(), &input_dev_mem);
     std::shared_ptr<BMNNTensor> input_tensor = m_bmNetwork->inputTensor(0);
     input_tensor->set_device_mem(&input_dev_mem);
-    // input_tensor->set_shape_by_dim(0, num);
     return stateType::SUCCESS;
 }
 
 stateType sophgo_detect::inference(){
     auto ret = m_bmNetwork->forward();
-    return stateType::SUCCESS;
+    return ret == BM_SUCCESS ? stateType::SUCCESS : stateType::INFERENCE_ERROR;
 
 }
 
@@ -175,7 +179,7 @@ stateType sophgo_detect::postProcess(bm_image* inputImages, std::vector<detectBo
             ret = yolov5Post(inputImages, outputBoxes, num);
             break;
         default:
-            ret = stateType::ERROR;
+            ret = stateType::UNMATCH_YOLO_TYPE_ERROR;
             break;
     }
     return ret;
@@ -207,7 +211,7 @@ stateType sophgo_detect::resizeBox(bm_image* inputImage, detectBoxes& outputBoxe
         box.width = box.right - box.left;
         box.height = box.bottom - box.top;
     }
-    
+    return stateType::SUCCESS;
 }
 
 stateType sophgo_detect::yolov5Post(bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, int num){
@@ -225,6 +229,7 @@ stateType sophgo_detect::yolov5Post(bm_image* inputImages, std::vector<detectBox
       for(int i=0; i<m_output_num; i++){
         auto output_shape = m_bmNetwork->outputTensor(i)->get_shape();
         auto output_dims = output_shape->num_dims;
+        YOLO_CHECK(output_dims == 5, "The Yolov5 output's dim must be five. which means to [batch, anchor_num, feature_height,feature_width,feature]")
         box_num += output_shape->dims[1] * output_shape->dims[2] * output_shape->dims[3];
       }
   
@@ -373,6 +378,7 @@ stateType sophgo_detect::yolov5Post(bm_image* inputImages, std::vector<detectBox
           }
       }
       resizeBox(inputImages+batch_idx, resVec);
+      YOLO_DEBUG("batch_id: {}, outputbox number is {}", batch_idx, resVec.size());
       outputBoxes.push_back(resVec);
     }
     return stateType::SUCCESS;
