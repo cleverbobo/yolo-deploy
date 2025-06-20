@@ -55,7 +55,7 @@ if (${TARGET_ARCH} STREQUAL "sophgo")
     target_link_libraries(detect ${FFMPEG_LIBS} ${OpenCV_LIBS} ${BM_LIBS} ${JPU_LIBS} -lpthread -lutils -lsophgo_framework)
     
 
-elseif (${TARGET_ARCH} STREQUAL "nvidia_pcie")
+elseif (${TARGET_ARCH} STREQUAL "nvidia")
     set(TENSORRT_ROOT "/usr/src/tensorrt")
 
     # trt runtime

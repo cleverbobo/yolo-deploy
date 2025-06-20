@@ -15,14 +15,12 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -rdynamic")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -rdynamic")
 
 # 公共的头文件
-include_directories(../../element/Det/include)
-include_directories(../../framework/include)
-include_directories(../../framework/utils/include)
-
-include_directories(../../3rdparty/argparse-3.2/include)
+include_directories(../../../element/Det/include)
+include_directories(../../../framework/include)
+include_directories(../../../framework/utils/include)
 
 # 公共的库目录
-link_directories(../../build/lib)
+link_directories(../../../build/lib)
 
 
 if (${TARGET_ARCH} STREQUAL "sophgo")
@@ -42,9 +40,9 @@ if (${TARGET_ARCH} STREQUAL "sophgo")
     include_directories(${LIBSOPHON_INCLUDE_DIRS})
     link_directories(${LIBSOPHON_LIB_DIRS})
 
-    include_directories(../../framework/sophgo_framework/include)
+    include_directories(../../../framework/sophgo_framework/include)
 
-    add_executable(detect.sophgo detect.cpp)
+    add_executable(detect_sophgo.run detect.cpp)
     target_link_libraries(detect_sophgo.run ${OpenCV_LIBS} -ldetect -lsophgo_framework -lutils)
 
 endif()

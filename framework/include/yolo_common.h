@@ -4,7 +4,7 @@
 #include <vector>
 #include <sstream>
 
-#include "log.hpp"
+#include "log.h"
 #include "magic_enum/magic_enum.hpp"
 
 #define YOLO_LIKELY(expr) (__builtin_expect(static_cast<bool>(expr), 1))

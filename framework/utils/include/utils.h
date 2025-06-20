@@ -8,8 +8,12 @@
 
 namespace cv {
     class Mat;
-    class Size;
-    class Scalar;
+    
+    template<typename _Tp> class Size_;
+    typedef Size_<int> Size;
+
+    template<typename _Tp> class Scalar_;
+    typedef Scalar_<double> Scalar;
 }
 
 // math functions

@@ -4,7 +4,7 @@ project(yolo-deploy-det-nvidia)
 set(CMAKE_CXX_STANDARD 17)
 
 if (NOT DEFINED TARGET_ARCH)
-    set(TARGET_ARCH nvidia_pcie)
+    set(TARGET_ARCH nvidia)
 endif()
 
 message(STATUS "[INFO] BUILD DET SAMPLE FOR TARGET_ARCH: ${TARGET_ARCH}")
@@ -25,13 +25,13 @@ include_directories(../../3rdparty/argparse-3.2/include)
 # 公共的库目录
 link_directories(../../build/lib)
 
-if (${TARGET_ARCH} STREQUAL "nvidia_pcie")
+if (${TARGET_ARCH} STREQUAL "nvidia")
 
     find_package(OpenCV REQUIRED)
     include_directories(${OpenCV_INCLUDE_DIRS})
     link_directories(${OpenCV_LIB_DIRS})
 
-    add_executable(detect.nvidia_pcie detect.cpp)
+    add_executable(detect_nvidia.run detect.cpp)
     target_link_libraries(detect_nvidia.run ${OpenCV_LIBS} -ldetect -lutils)
 
 endif()
