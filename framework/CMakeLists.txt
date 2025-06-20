@@ -4,12 +4,16 @@ project(yolo-deploy-framework)
 set(CMAKE_CXX_STANDARD 17)
 
 if (NOT DEFINED TARGET_ARCH)
-    set(TARGET_ARCH sophgo_pcie)
+    set(TARGET_ARCH sophgo)
 endif()
 
 message(STATUS "[INFO] BUILD FRAMEWORK FOR TARGET_ARCH: ${TARGET_ARCH}")
 
-if (${TARGET_ARCH} STREQUAL "sophgo_pcie")
+# 设置公共的头文件和库目录
+include_directories(./include)
+include_directories(./utils/include)
+
+if (${TARGET_ARCH} STREQUAL "sophgo")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}  -fprofile-arcs")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -rdynamic")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -rdynamic -fpermissive")
@@ -36,9 +40,9 @@ if (${TARGET_ARCH} STREQUAL "sophgo_pcie")
         set(JPU_LIBS bmjpuapi bmjpulite)
     endif()
 
-    include_directories(./include)
+    
     include_directories(./sophgo_framework/include)
-    include_directories(./utils/include)
+    
 
     add_library(sophgo_framework SHARED
         ./sophgo_framework/src/ff_decode.cpp
@@ -54,35 +58,16 @@ if (${TARGET_ARCH} STREQUAL "sophgo_pcie")
     
     
 
-elseif(${TARGET_ARCH} STREQUAL "soc")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}  -fprofile-arcs -ftest-coverage -g -rdynamic")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}  -fprofile-arcs -ftest-coverage -rdynamic -fpermissive")
-    add_compile_options(-fPIC)
-    set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
-    set(CMAKE_ASM_COMPILER aarch64-linux-gnu-gcc)
-    set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
-    include_directories("${SOPHON_SDK_SOC}/include/")
-    include_directories("${SOPHON_SDK_SOC}/include/opencv4")
-    link_directories("${SOPHON_SDK_SOC}/lib/")
-    include_directories(.)
+elseif(${TARGET_ARCH} STREQUAL "nvidia_pcie")
+    # 使用公版的opencv
+    find_package(OpenCV REQUIRED)
+    include_directories(${OpenCV_INCLUDE_DIRS})
+    link_directories(${OpenCV_LIB_DIRS})
 
-    set(BM_LIBS bmlib bmrt bmcv yuv)
-    find_library(BMJPU bmjpuapi)
-    if(BMJPU)
-        set(JPU_LIBS bmjpuapi bmjpulite)
-    endif()
-
-    include_directories(./include)
-    include_directories(./sophgo_framework/include)
-    include_directories(./utils/include)
-
-    add_library(sophgo_framework SHARED
-        src/ff_decode.cpp
-    )
-    target_link_libraries(sophgo_framework ${OPENCV_LIBS} ${BM_LIBS} ${JPU_LIBS})
-
-    add_library(utils SHARED
+    dd_library(utils SHARED
         utils/src/utils.cpp)
-    target_link_libraries(utils  ${OPENCV_LIBS})
+    target_link_options(utils PRIVATE "LINKER:-no-undefined")
+    target_link_libraries(utils PUBLIC ${OpenCV_LIBS})
+
 
 endif()

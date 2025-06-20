@@ -3,16 +3,10 @@ project(sophon-stream)
 set(CMAKE_CXX_STANDARD 17)
 
 if (NOT DEFINED TARGET_ARCH)
-    set(TARGET_ARCH sophgo_pcie)
+    set(TARGET_ARCH sophgo)
 endif()
 
 message(STATUS "[INFO] START BUILD FOR TARGET_ARCH: ${TARGET_ARCH}")
-
-if (${TARGET_ARCH} STREQUAL "sophgo_soc")
-    if (NOT DEFINED SOPHON_SDK_SOC)
-        message(FATAL_ERROR "Please set SOPHON_SDK_SOC for building sophgo_soc")
-    endif()
-endif()
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/build/lib)
 add_subdirectory(framework)
@@ -39,5 +33,5 @@ add_dependencies(detect utils)
 # checkAndAddElement(element/Seg)
 
 checkAndAddSample(sample/Det)
-add_dependencies(detect.sophgo_pcie detect)
+add_dependencies(detect.sophgo detect)
 

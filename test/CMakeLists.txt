@@ -5,12 +5,12 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 if (NOT DEFINED TARGET_ARCH)
-    set(TARGET_ARCH sophgo_pcie)
+    set(TARGET_ARCH sophgo)
 endif()
 
 message(STATUS "[INFO] BUILD TEST CASE FOR TARGET_ARCH: ${TARGET_ARCH}")
 
-if (${TARGET_ARCH} STREQUAL "sophgo_pcie")
+if (${TARGET_ARCH} STREQUAL "sophgo")
 
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}  -fprofile-arcs")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -rdynamic")
