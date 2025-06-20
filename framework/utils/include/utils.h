@@ -8,6 +8,8 @@
 
 namespace cv {
     class Mat;
+    class Size;
+    class Scalar;
 }
 
 // math functions
@@ -17,7 +19,7 @@ float sigmoid(float x);
 void NMS(detectBoxes& inputBox, detectBoxes& outputBox, float nmsThreshold);
 void getAspectParam(int src_w, int src_h, int dst_w, int dst_h, 
                     int& dx, int& dy, float& scale_x, float& scale_y, resizeType type);
-
+cv::Mat letterbox(const cv::Mat& src, const cv::Size& dst_shape,const cv::Scalar& color);
 
 // draw functions only for debug
 void drawBox(detectBoxes& boxes, cv::Mat& img, std::string outputName, std::string outputDirPath = "./detect_result");
@@ -38,3 +40,6 @@ std::string getFileName(const std::string& path);
 
 INPUTTYPE classifyInput(const std::string& str);
 std::vector<std::string> getJpgFiles(const std::string& dirPath);
+
+// 以二进制方式加载文件
+std::vector<char> loadFile(const std::string& filePath);

@@ -5,9 +5,12 @@
 #include <sstream>
 
 #include "log.hpp"
+#include "magic_enum/magic_enum.hpp"
 
 #define YOLO_LIKELY(expr) (__builtin_expect(static_cast<bool>(expr), 1))
 #define YOLO_UNLIKELY(expr) (__builtin_expect(static_cast<bool>(expr), 0))
+
+#define enumName(expr) magic_enum::enum_name(expr) 
 
 inline std::string concatArgs() { return ""; }
 
@@ -28,7 +31,7 @@ inline std::string concatArgs(const T& arg, const Args&... args) {
   }
 
 // yolo config
-enum struct yoloType {
+enum class yoloType {
     YOLOV5,
     YOLOV6,
     YOLOV7,
@@ -48,7 +51,6 @@ enum class deviceType {
     SOPHGO,
     NVIDIA,
     RKNN,
-    JETSON,
     CPU
 };
 
@@ -60,8 +62,8 @@ enum class resizeType {
 
 // default is YOLOv5 config
 struct YOLOConfig {
-    std::vector<float> mean = {1/255.0, 1/255.0, 1/255.0};
-    std::vector<float> std = {1.0, 1.0, 1.0};
+    std::vector<float> mean = {0.0f, 0.0f, 0.0f};
+    std::vector<float> std = {1.0f/255, 1.0f/255, 1.0f/255};
     bool bgr2rgb = true;
     resizeType resize_type = resizeType::RESIZE_CENTER_PAD;
     int padValue = 114;
@@ -100,6 +102,11 @@ enum class stateType {
     UNMATCH_YOLO_TYPE_ERROR
 };
 
+template <>
+struct magic_enum::customize::enum_range<stateType> {
+    static constexpr int min = 0;
+    static constexpr int max = 6000;
+};
 
 
 struct detectBox {
@@ -143,4 +150,15 @@ class NoCopyable {
       NoCopyable(const NoCopyable&) = delete;
       NoCopyable& operator=(const NoCopyable& rhs)= delete;
   };
-  
+
+// 单例模式
+template <class objectType>
+class Sinlgeton : public NoCopyable {
+public:
+    // 这里要返回引用或者智能指针
+    static objectType& getInstance() {
+        static objectType m_obj;
+        return m_obj;
+    }
+};
+

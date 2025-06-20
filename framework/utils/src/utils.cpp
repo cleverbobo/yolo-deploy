@@ -104,17 +104,30 @@ void getAspectParam(int src_w, int src_h, int dst_w, int dst_h,
     }
 }
 
+cv::Mat letterbox(const cv::Mat& src, const cv::Size& dst_shape, 
+                  cv::Scalar color = cv::Scalar(114, 114, 114)) {
+    int src_w = src.cols, src_h = src.rows;
+    int dst_w = dst_shape.width, dst_h = dst_shape.height;
+    float r = std::min((float)dst_w / src_w, (float)dst_h / src_h);
+    int new_unpad_w = int(round(src_w * r));
+    int new_unpad_h = int(round(src_h * r));
+    int pad_w = dst_w - new_unpad_w;
+    int pad_h = dst_h - new_unpad_h;
+    int pad_left = pad_w / 2;
+    int pad_top = pad_h / 2;
 
+    cv::Mat resized;
+    cv::resize(src, resized, cv::Size(new_unpad_w, new_unpad_h));
+
+    cv::Mat out;
+    cv::copyMakeBorder(resized, out, pad_top, pad_h - pad_top, pad_left, pad_w - pad_left, 
+                       cv::BORDER_CONSTANT, color);
+    return out;
+}
 
 // draw functions only for debug
 // 绘制检测框
 void drawBox(detectBoxes& boxes, cv::Mat& img, std::string outputName, std::string outputDirPath = "./detect_result") {
-    // 读取图片
-    // cv::Mat img = cv::imread(inputPath);
-    // if (img.empty()) {
-    //     std::cerr << "无法读取图片: " << inputPath << std::endl;
-    //     return;
-    // }
 
     // 遍历所有检测框
     for (const auto& box : boxes) {
@@ -276,4 +289,23 @@ std::vector<std::string> getJpgFiles(const std::string& dirPath) {
     }
     closedir(dir);
     return jpgFiles;
+}
+
+// 以二进制方式加载文件
+std::vector<char> loadFile(const std::string& filePath) {
+    std::ifstream file(filePath, std::ios::binary);
+    if (!file) {
+        std::cerr << "无法打开文件: " << filePath << std::endl;
+        return {};
+    }
+    
+    file.seekg(0, std::ifstream::end);
+    auto size = file.tellg();
+    file.seekg(0, std::ifstream::beg);
+
+    std::vector<char> buffer(size);
+    file.read(buffer.data(), size);
+    file.close();
+
+    return buffer;
 }

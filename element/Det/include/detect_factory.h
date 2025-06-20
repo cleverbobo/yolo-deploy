@@ -25,3 +25,12 @@ public:
 
 };
 
+class trt_detect_factory : public detect_factory {
+public:
+    trt_detect_factory();
+    ~trt_detect_factory() override;
+
+    std::shared_ptr<detect> getInstance(std::string, yoloType, int) override;
+
+};
+
