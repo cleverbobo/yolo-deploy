@@ -21,6 +21,7 @@ include_directories(include)
 # 公共的lib目录
 link_directories(../../build/lib)
 
+
 if (${TARGET_ARCH} STREQUAL "sophgo")
     set(FFMPEG_DIR  /opt/sophon/sophon-ffmpeg-latest/lib/cmake)
     find_package(FFMPEG REQUIRED)
@@ -73,6 +74,10 @@ elseif (${TARGET_ARCH} STREQUAL "nvidia")
         src/detect_factory.cpp
         src/trt_detect.cpp)
 
-    target_link_libraries(detect nvinfer ${CUDA_LIBRARIES} ${OpenCV_LIBS} -lpthread -lutils)
+    
+    # target_link_libraries(detect nvinfer ${CUDA_LIBRARIES} ${OpenCV_LIBS} -lpthread -lutils)
+    # debug
+    link_directories(/usr/local/lib)
+    target_link_libraries(detect nvinfer ${CUDA_LIBRARIES} ${OpenCV_LIBS} -lpthread -lutils -lcnpy)
 
 endif()

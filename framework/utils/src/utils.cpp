@@ -105,7 +105,7 @@ void getAspectParam(int src_w, int src_h, int dst_w, int dst_h,
 }
 
 cv::Mat letterbox(const cv::Mat& src, const cv::Size& dst_shape, 
-                  cv::Scalar color = cv::Scalar(114, 114, 114)) {
+                  const cv::Scalar& color = cv::Scalar(114, 114, 114)) {
     int src_w = src.cols, src_h = src.rows;
     int dst_w = dst_shape.width, dst_h = dst_shape.height;
     float r = std::min((float)dst_w / src_w, (float)dst_h / src_h);
@@ -127,7 +127,7 @@ cv::Mat letterbox(const cv::Mat& src, const cv::Size& dst_shape,
 
 // draw functions only for debug
 // 绘制检测框
-void drawBox(detectBoxes& boxes, cv::Mat& img, std::string outputName, std::string outputDirPath = "./detect_result") {
+void drawBox(detectBoxes& boxes, cv::Mat& img, std::string outputName, std::string outputDirPath) {
 
     // 遍历所有检测框
     for (const auto& box : boxes) {

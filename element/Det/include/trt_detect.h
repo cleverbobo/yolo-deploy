@@ -20,11 +20,11 @@ class trt_detect : public detect {
         trt_detect(std::string modelPath, yoloType type, int devId = 0);
         ~trt_detect();
 
-        std::vector<detectBoxes> process(void* inputImage, int num) = 0;
+        std::vector<detectBoxes> process(void* inputImage, int num) override;
 
-        algorithmInfo getAlgorithmInfo() = 0;
-        void printAlgorithmInfo() = 0;
-        stateType resetAnchor(std::vector<std::vector<std::vector<int>>>) = 0;
+        algorithmInfo getAlgorithmInfo() override;
+        void printAlgorithmInfo() override;
+        stateType resetAnchor(std::vector<std::vector<std::vector<int>>>) override;
     
     private:
         // algorithm config

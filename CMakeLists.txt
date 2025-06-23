@@ -9,6 +9,11 @@ add_compile_definitions("${TARGET_ARCH}")
 
 message(STATUS "[INFO] START BUILD FOR TARGET_ARCH: ${TARGET_ARCH}")
 
+# 设置为debug模式
+set(CMAKE_BUILD_TYPE Debug)
+# 编译优化设置为O0
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
+
 # 公共的第三方库的头文件查找路径
 include_directories(3rdparty/argparse-3.2/include)
 include_directories(3rdparty/spdlog-1.15.3/include)

@@ -12,8 +12,8 @@ message(STATUS "[INFO] BUILD FRAMEWORK FOR TARGET_ARCH: ${TARGET_ARCH}")
 # 设置公共的头文件和库目录
 include_directories(./include)
 include_directories(./utils/include)
-include_directories(../3rdparty/spdlog-1.15.3/include)
-include_directories(../3rdparty/magic_enum/include)
+# include_directories(../3rdparty/spdlog-1.15.3/include)
+# include_directories(../3rdparty/magic_enum/include)
 
 
 if (${TARGET_ARCH} STREQUAL "sophgo")
@@ -68,7 +68,7 @@ elseif(${TARGET_ARCH} STREQUAL "nvidia")
     include_directories(${OpenCV_INCLUDE_DIRS})
     link_directories(${OpenCV_LIB_DIRS})
 
-    dd_library(utils SHARED
+    add_library(utils SHARED
         src/log.cpp
         utils/src/utils.cpp)
     target_link_options(utils PRIVATE "LINKER:-no-undefined")

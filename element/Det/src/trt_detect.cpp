@@ -1,7 +1,12 @@
 #include "trt_detect.h"
 #include "utils.h"
 
-void trt_logger::log(Severity severity, nvinfer1::AsciiChar const* msg) {
+// debug
+#ifdef YOLO_DEBUG
+#include <cnpy.h>
+#endif
+
+void trt_logger::log(Severity severity, nvinfer1::AsciiChar const* msg) noexcept{
     // Initialize logger if needed
     auto m_logger = yoloLogger::getInstance();
     switch (severity) {
@@ -28,13 +33,14 @@ void trt_logger::log(Severity severity, nvinfer1::AsciiChar const* msg) {
 
 trt_detect::trt_detect(std::string modelPath, yoloType type, int devId)
     : m_yoloType(type), m_devId(devId) {
+    m_logger = trt_logger();
     // runtime initialization
-    m_trtRuntime = std::make_unique<nvinfer1::IRuntime>(nvinfer1::createInferRuntime(m_logger));
+    m_trtRuntime.reset(nvinfer1::createInferRuntime(m_logger));
 
     // load the engine
     auto engineFileData = loadFile(modelPath);
     YOLO_CHECK(!engineFileData.empty(), "Failed to load TRT engine file: " + modelPath);
-    m_trtEngine = std::shared_ptr<nvinfer1::ICudaEngine>(
+    m_trtEngine.reset(
         m_trtRuntime->deserializeCudaEngine(engineFileData.data(), engineFileData.size()));
     
     cudaStreamCreate(&m_stream);
@@ -80,12 +86,13 @@ trt_detect::trt_detect(std::string modelPath, yoloType type, int devId)
 
 
     // 配置 preprocess config
-    m_mean = {0.0f, 0.0f, 0.0f};
-    m_std = {1.0f/255, 1.0f/255, 1.0f/255};
-    m_bgr2rgb = true; // 默认BGR转RGB
-    m_padValue = 114; // 默认pad值
-    m_resizeType = resizeType::RESIZE_CENTER_PAD;
-
+    auto yoloConfig = getYOLOConfig(m_yoloType);
+    m_mean = yoloConfig.mean;
+    m_std = yoloConfig.std;
+    m_bgr2rgb = yoloConfig.bgr2rgb;
+    m_padValue = yoloConfig.padValue;
+    m_anchors = yoloConfig.anchors;
+    m_resizeType = yoloConfig.resize_type;
 
     // 配置network config
     m_max_batch = m_trtEngine->getTensorShape(m_inputNames[0]).d[0];
@@ -127,8 +134,9 @@ std::vector<detectBoxes> trt_detect::process(void* inputImage, int num) {
     std::vector<detectBoxes> outputBoxes;
 
     for (int i = 0; i < calculateTime; ++i) {
+        int inputNum = std::min(num - i * m_max_batch, m_max_batch);
         // preProcess the input images
-        auto ret = preProcess(imgPtr, num);
+        auto ret = preProcess(imgPtr + m_max_batch*i, num);
         YOLO_CHECK(ret == stateType::SUCCESS, "TRT Preprocess failed");
 
         // inference the model
@@ -137,7 +145,7 @@ std::vector<detectBoxes> trt_detect::process(void* inputImage, int num) {
 
         // postProcess the output
         
-        ret = postProcess(m_preprocess_images.data(), outputBoxes, num);
+        ret = postProcess(imgPtr + m_max_batch*i, outputBoxes, num);
         YOLO_CHECK(ret == stateType::SUCCESS, "TRT Postprocess failed");
     }
     return outputBoxes;
@@ -186,7 +194,7 @@ stateType trt_detect::preProcess(const Mat* inputImages, int num){
     for (int i = 0; i < num; ++i) {
         cv::Mat img_letterbox = letterbox(inputImages[i], cv::Size(m_net_w, m_net_h), cv::Scalar(m_padValue, m_padValue, m_padValue));
         cv::Mat blob = cv::dnn::blobFromImage(img_letterbox, m_std[0], cv::Size(m_net_w, m_net_h),
-                                              cv::Scalar(m_mean[0],m_mean[1],m_mean[2]), true, false);
+                                              cv::Scalar(m_mean[0],m_mean[1],m_mean[2]), true, false);  
         cudaMemcpyAsync(m_inputMem[i], blob.data, m_inputSize[i], cudaMemcpyHostToDevice, m_stream);
     }
     return stateType::SUCCESS;
@@ -281,7 +289,7 @@ stateType trt_detect::resizeBox(const cv::Mat* inputImage, detectBoxes& outputBo
 }
 
 stateType trt_detect::yolov5Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, int num){
-    for (int i = 0; i < num; ++i) {
+    for (int i = 0; i < m_outputMem.size(); ++i) {
         cudaMemcpyAsync(m_outputCpuMem[i].get(), m_outputMem[i], m_outputSize[i], cudaMemcpyDeviceToHost, m_stream);
     }
     // 同步数据
@@ -309,7 +317,7 @@ stateType trt_detect::yolov5Post(const Mat* inputImages, std::vector<detectBoxes
       float transformed_m_confThreshold = - std::log(1 / m_confThreshold - 1);
   
       // init detect head    
-      std::vector<float> decoded_data(box_num*out_nout);
+      std::vector<float> decoded_data(box_num*out_nout, -1);
       float *dst = decoded_data.data();
 
       for(int head_idx = 0; head_idx < m_output_num; head_idx++) {

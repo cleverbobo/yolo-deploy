@@ -1,18 +1,17 @@
 #include <filesystem>
 
 #include "detect_factory.h"
-
-#include "ff_decode.h"
 #include "utils.h"
-
 #include "argparse/argparse.hpp"
+
+#include "opencv2/opencv.hpp"
 
 int main(int argc, char** argv) {
     argparse::ArgumentParser detect_parser("detect");
     detect_parser.add_argument("-m", "--model")
         .required()
         .help("Path to your model file")
-        .default_value(std::string("./yolov5.bmodel"));
+        .default_value(std::string("./yolov5s_v6.1_3output_f32.engine"));
 
     detect_parser.add_argument("-i", "--input")
         .required()
