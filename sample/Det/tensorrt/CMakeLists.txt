@@ -14,10 +14,6 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}  -fprofile-arcs")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -rdynamic")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -rdynamic")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -rdynamic")
-# 设置为debug模式
-set(CMAKE_BUILD_TYPE Debug)
-# 编译优化设置为O0
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
 
 # 公共的头文件
 include_directories(../../../element/Det/include)

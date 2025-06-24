@@ -9,10 +9,20 @@ add_compile_definitions("${TARGET_ARCH}")
 
 message(STATUS "[INFO] START BUILD FOR TARGET_ARCH: ${TARGET_ARCH}")
 
-# 设置为debug模式
-set(CMAKE_BUILD_TYPE Debug)
-# 编译优化设置为O0
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
+if (NOT DEFINED CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+message(STATUS "[INFO] CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
+
+if (CMAKE_BUILD_TYPE STREQUAL "Debug")
+    # 设置为debug模式
+    set(CMAKE_BUILD_TYPE Debug)
+    # 编译优化设置为O0
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
+else()
+    # 编译优化设置为O0
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+endif()
 
 # 公共的第三方库的头文件查找路径
 include_directories(3rdparty/argparse-3.2/include)
