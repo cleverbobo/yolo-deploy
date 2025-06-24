@@ -31,8 +31,8 @@ void trt_logger::log(Severity severity, nvinfer1::AsciiChar const* msg) noexcept
     }
 }
 
-trt_detect::trt_detect(std::string modelPath, yoloType type, int devId)
-    : m_yoloType(type), m_devId(devId) {
+trt_detect::trt_detect(const std::string& modelPath, const yoloType& type, const int devId)
+    : detect(modelPath,type,devId) {
     m_logger = trt_logger();
     // runtime initialization
     m_trtRuntime.reset(nvinfer1::createInferRuntime(m_logger));
@@ -86,13 +86,13 @@ trt_detect::trt_detect(std::string modelPath, yoloType type, int devId)
 
 
     // 配置 preprocess config
-    auto yoloConfig = getYOLOConfig(m_yoloType);
-    m_mean = yoloConfig.mean;
-    m_std = yoloConfig.std;
-    m_bgr2rgb = yoloConfig.bgr2rgb;
-    m_padValue = yoloConfig.padValue;
-    m_anchors = yoloConfig.anchors;
-    m_resizeType = yoloConfig.resize_type;
+    // auto yoloConfig = getYOLOConfig(m_yoloType);
+    // m_mean = yoloConfig.mean;
+    // m_std = yoloConfig.std;
+    // m_bgr2rgb = yoloConfig.bgr2rgb;
+    // m_padValue = yoloConfig.padValue;
+    // m_anchors = yoloConfig.anchors;
+    // m_resizeType = yoloConfig.resize_type;
 
     // 配置network config
     m_max_batch = m_trtEngine->getTensorShape(m_inputNames[0]).d[0];
@@ -109,8 +109,10 @@ trt_detect::trt_detect(std::string modelPath, yoloType type, int devId)
     // 配置 algorithm info
     m_algorithmInfo.yolo_type = m_yoloType;
     m_algorithmInfo.algorithm_type = algorithmType::DETECT;
-    m_algorithmInfo.device_type = deviceType::NVIDIA;
+    m_algorithmInfo.device_type = deviceType::TENSORRT;
     m_algorithmInfo.batch_size = m_trtEngine->getTensorShape(m_inputNames[0]).d[0];
+
+    printAlgorithmInfo();
         
 }
 
@@ -126,7 +128,7 @@ trt_detect::~trt_detect() {
     cudaStreamDestroy(m_stream);
 }
 
-std::vector<detectBoxes> trt_detect::process(void* inputImage, int num) {
+std::vector<detectBoxes> trt_detect::process(void* inputImage, const int num) {
     const cv::Mat* imgPtr = static_cast<const cv::Mat*>(inputImage);
 
     stateType ret = stateType::SUCCESS;
@@ -151,46 +153,46 @@ std::vector<detectBoxes> trt_detect::process(void* inputImage, int num) {
     return outputBoxes;
 }
 
-algorithmInfo trt_detect::getAlgorithmInfo(){
-    return m_algorithmInfo;
-}
+// algorithmInfo trt_detect::getAlgorithmInfo(){
+//     return m_algorithmInfo;
+// }
 
-void trt_detect::printAlgorithmInfo() {
-    std::cout << "----------------AlgorithmInfo-----------------" << std::endl;
-    std::cout << "YOLO Type: " << enumName(m_yoloType) << std::endl;
-    std::cout << "Device Type: " << enumName(m_deviceType) << std::endl;
-    std::cout << "Algorithm Type: " << enumName(m_algorithmInfo.algorithm_type) << std::endl;
-    std::cout << "Input Shape: ";
-    for (const auto& shape : m_algorithmInfo.input_shape) {
-        std::cout << "[";
-        for (const auto& dim : shape) {
-            std::cout << dim << " ";
-        }
-        std::cout << "] ";
-    }
-    std::cout << std::endl;
+// void trt_detect::printAlgorithmInfo() {
+//     std::cout << "----------------AlgorithmInfo-----------------" << std::endl;
+//     std::cout << "YOLO Type: " << enumName(m_yoloType) << std::endl;
+//     std::cout << "Device Type: " << enumName(m_deviceType) << std::endl;
+//     std::cout << "Algorithm Type: " << enumName(m_algorithmInfo.algorithm_type) << std::endl;
+//     std::cout << "Input Shape: ";
+//     for (const auto& shape : m_algorithmInfo.input_shape) {
+//         std::cout << "[";
+//         for (const auto& dim : shape) {
+//             std::cout << dim << " ";
+//         }
+//         std::cout << "] ";
+//     }
+//     std::cout << std::endl;
 
-    std::cout << "Output Shape: ";
-    for (const auto& shape : m_algorithmInfo.output_shape) {
-        std::cout << "[";        
-        for (const auto& dim : shape) {
-            std::cout << dim << " ";
-        }
-        std::cout << "] ";
-    }
-    std::cout << std::endl;
-    std::cout << "Batch Size: " << m_algorithmInfo.batch_size << std::endl;
-    std::cout << "----------------AlgorithmInfo-----------------" << std::endl;
-}
+//     std::cout << "Output Shape: ";
+//     for (const auto& shape : m_algorithmInfo.output_shape) {
+//         std::cout << "[";        
+//         for (const auto& dim : shape) {
+//             std::cout << dim << " ";
+//         }
+//         std::cout << "] ";
+//     }
+//     std::cout << std::endl;
+//     std::cout << "Batch Size: " << m_algorithmInfo.batch_size << std::endl;
+//     std::cout << "----------------AlgorithmInfo-----------------" << std::endl;
+// }
 
-stateType trt_detect::resetAnchor(std::vector<std::vector<std::vector<int>>> anchors) {
-    m_anchors = anchors;
-    return stateType::SUCCESS;
-}
+// stateType trt_detect::resetAnchor(std::vector<std::vector<std::vector<int>>> anchors) {
+//     m_anchors = anchors;
+//     return stateType::SUCCESS;
+// }
 
 
 
-stateType trt_detect::preProcess(const Mat* inputImages, int num){
+stateType trt_detect::preProcess(const Mat* inputImages, const int num){
     for (int i = 0; i < num; ++i) {
         cv::Mat img_letterbox = letterbox(inputImages[i], cv::Size(m_net_w, m_net_h), cv::Scalar(m_padValue, m_padValue, m_padValue));
         cv::Mat blob = cv::dnn::blobFromImage(img_letterbox, m_std[0], cv::Size(m_net_w, m_net_h),
@@ -224,7 +226,7 @@ stateType trt_detect::inference() {
     return stateType::SUCCESS;
 }
 
-stateType trt_detect::postProcess(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, int num) {
+stateType trt_detect::postProcess(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num) {
     auto ret = stateType::SUCCESS;
     switch (m_yoloType) {
         case yoloType::YOLOV5:
@@ -237,7 +239,7 @@ stateType trt_detect::postProcess(const Mat* inputImages, std::vector<detectBoxe
     return ret;
 }
 
-int trt_detect::get_element_size(nvinfer1::DataType type) const {
+int trt_detect::get_element_size(const nvinfer1::DataType& type) const {
     switch (type) {
         case nvinfer1::DataType::kFLOAT:
             return sizeof(float);
@@ -288,7 +290,7 @@ stateType trt_detect::resizeBox(const cv::Mat* inputImage, detectBoxes& outputBo
     return stateType::SUCCESS;
 }
 
-stateType trt_detect::yolov5Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, int num){
+stateType trt_detect::yolov5Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num){
     for (int i = 0; i < m_outputMem.size(); ++i) {
         cudaMemcpyAsync(m_outputCpuMem[i].get(), m_outputMem[i], m_outputSize[i], cudaMemcpyDeviceToHost, m_stream);
     }

@@ -18,7 +18,7 @@
     }
 #endif
 
-#ifdef nvidia
+#ifdef tensorrt
     #include <trt_detect.h>
     // trt_detect_factory implementation
     trt_detect_factory::trt_detect_factory() {
@@ -32,4 +32,4 @@
     std::shared_ptr<detect> trt_detect_factory::getInstance(std::string modelPath, yoloType type, int devId) {
         return std::make_shared<trt_detect>(modelPath, type, devId);
     }
-#endif // nvidia
+#endif // tensorrt

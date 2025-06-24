@@ -49,6 +49,7 @@ if (${TARGET_ARCH} STREQUAL "sophgo")
     
 
     add_library(detect SHARED  
+        src/detect.cpp
         src/detect_factory.cpp
         src/sophgo_detect.cpp)
     
@@ -56,7 +57,7 @@ if (${TARGET_ARCH} STREQUAL "sophgo")
     target_link_libraries(detect ${FFMPEG_LIBS} ${OpenCV_LIBS} ${BM_LIBS} ${JPU_LIBS} -lpthread -lutils -lsophgo_framework)
     
 
-elseif (${TARGET_ARCH} STREQUAL "nvidia")
+elseif (${TARGET_ARCH} STREQUAL "tensorrt")
     set(TENSORRT_ROOT "/usr/src/tensorrt")
 
     # trt runtime
@@ -70,7 +71,8 @@ elseif (${TARGET_ARCH} STREQUAL "nvidia")
     include_directories(${OpenCV_INCLUDE_DIRS})
     link_directories(${OpenCV_LIB_DIRS})
 
-    add_library(detect SHARED  
+    add_library(detect SHARED 
+        src/detect.cpp
         src/detect_factory.cpp
         src/trt_detect.cpp)
 

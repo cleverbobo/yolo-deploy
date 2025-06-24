@@ -10,12 +10,12 @@
 
 
 
-sophgo_detect::sophgo_detect(std::string modelPath, yoloType type, int devId) {
+sophgo_detect::sophgo_detect(const std::string& modelPath, const yoloType& type, const int devId):detect(modelPath, type, devId) {
     // init device id;
-    m_devId = devId;
+    // m_devId = devId;
 
     // init handle
-    m_handle = std::make_shared<BMNNHandle>(devId);
+    m_handle = std::make_shared<BMNNHandle>(m_devId);
     auto h = m_handle->handle();
 
     // init context
@@ -29,14 +29,14 @@ sophgo_detect::sophgo_detect(std::string modelPath, yoloType type, int devId) {
     m_net_h = tensor->get_shape()->dims[2];
     m_net_w = tensor->get_shape()->dims[3];
 
-    m_yoloType = type;
-    auto yoloConfig = getYOLOConfig(m_yoloType);
-    m_mean = yoloConfig.mean;
-    m_std = yoloConfig.std;
-    m_bgr2rgb = yoloConfig.bgr2rgb;
-    m_padValue = yoloConfig.padValue;
-    m_anchors = yoloConfig.anchors;
-    m_resizeType = yoloConfig.resize_type;
+    // m_yoloType = type;
+    // auto yoloConfig = getYOLOConfig(m_yoloType);
+    // m_mean = yoloConfig.mean;
+    // m_std = yoloConfig.std;
+    // m_bgr2rgb = yoloConfig.bgr2rgb;
+    // m_padValue = yoloConfig.padValue;
+    // m_anchors = yoloConfig.anchors;
+    // m_resizeType = yoloConfig.resize_type;
 
 
     // init postprocess
@@ -84,7 +84,7 @@ sophgo_detect::~sophgo_detect() {
     }
 }
 
-std::vector<detectBoxes> sophgo_detect::process(void* inputImage, int num) {
+std::vector<detectBoxes> sophgo_detect::process(void* inputImage, const int num) {
     bm_image* imageData = reinterpret_cast<bm_image*>(inputImage);
 
     stateType ret = stateType::SUCCESS;
@@ -111,24 +111,24 @@ std::vector<detectBoxes> sophgo_detect::process(void* inputImage, int num) {
     return outputBoxes;
 }
 
-algorithmInfo sophgo_detect::getAlgorithmInfo() {
-   return m_algorithmInfo;
-}
+// algorithmInfo sophgo_detect::getAlgorithmInfo() {
+//    return m_algorithmInfo;
+// }
 
-void sophgo_detect::printAlgorithmInfo() {
-    std ::cout << "\n---------------------------AlgorithmInfo----------------------------" << std::endl;
-    std::cout << "YOLO Type: " << int(m_yoloType) << std::endl;
-    std::cout << "Device ID: " << m_devId << std::endl;
-    std ::cout << "---------------------------AlgorithmInfo----------------------------\n" << std::endl;
-}
+// void sophgo_detect::printAlgorithmInfo() {
+//     std ::cout << "\n---------------------------AlgorithmInfo----------------------------" << std::endl;
+//     std::cout << "YOLO Type: " << int(m_yoloType) << std::endl;
+//     std::cout << "Device ID: " << m_devId << std::endl;
+//     std ::cout << "---------------------------AlgorithmInfo----------------------------\n" << std::endl;
+// }
 
-stateType sophgo_detect::resetAnchor(std::vector<std::vector<std::vector<int>>> anchors) {
-    m_anchors = anchors;
-    return stateType::SUCCESS;
-}
+// stateType sophgo_detect::resetAnchor(std::vector<std::vector<std::vector<int>>> anchors) {
+//     m_anchors = anchors;
+//     return stateType::SUCCESS;
+// }
 
 
-stateType sophgo_detect::preProcess(bm_image* inputImages, int num){
+stateType sophgo_detect::preProcess(bm_image* inputImages, const int num){
     auto handle = m_handle->handle();
 
     std::vector<bmcv_padding_atrr_t> padding_attrs(num);
@@ -159,8 +159,8 @@ stateType sophgo_detect::preProcess(bm_image* inputImages, int num){
 
     // attach to tensor
     bm_device_mem_t input_dev_mem;
-    num = num != m_max_batch ? m_max_batch : num;
-    bm_image_get_contiguous_device_mem(num, m_preprocess_images.data(), &input_dev_mem);
+    auto num_ = num != m_max_batch ? m_max_batch : num;
+    bm_image_get_contiguous_device_mem(num_, m_preprocess_images.data(), &input_dev_mem);
     std::shared_ptr<BMNNTensor> input_tensor = m_bmNetwork->inputTensor(0);
     input_tensor->set_device_mem(&input_dev_mem);
     return stateType::SUCCESS;
@@ -172,7 +172,7 @@ stateType sophgo_detect::inference(){
 
 }
 
-stateType sophgo_detect::postProcess(bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, int num){
+stateType sophgo_detect::postProcess(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num){
     auto ret = stateType::SUCCESS;
     switch (m_yoloType) {
         case yoloType::YOLOV5:
@@ -186,7 +186,7 @@ stateType sophgo_detect::postProcess(bm_image* inputImages, std::vector<detectBo
     
 }
 
-stateType sophgo_detect::resizeBox(bm_image* inputImage, detectBoxes& outputBoxes){
+stateType sophgo_detect::resizeBox(const bm_image* inputImage, detectBoxes& outputBoxes){
 
     bm_image img = *inputImage;
     int img_w = img.width;
@@ -214,7 +214,7 @@ stateType sophgo_detect::resizeBox(bm_image* inputImage, detectBoxes& outputBoxe
     return stateType::SUCCESS;
 }
 
-stateType sophgo_detect::yolov5Post(bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, int num){
+stateType sophgo_detect::yolov5Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num){
 
     std::vector<std::shared_ptr<BMNNTensor>> outputTensors(m_output_num);
     for(int i=0; i<m_output_num; i++){

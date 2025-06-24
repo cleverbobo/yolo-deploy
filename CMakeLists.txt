@@ -48,9 +48,9 @@ if (${TARGET_ARCH} STREQUAL "sophgo")
     checkAndAddSample(sample/Det/sophgo)
     add_dependencies(detect_sophgo.run detect)
 
-elseif(${TARGET_ARCH} STREQUAL "nvidia")
-    checkAndAddSample(sample/Det/nvidia)
-    add_dependencies(detect_nvidia.run detect)
+elseif(${TARGET_ARCH} STREQUAL "tensorrt")
+    checkAndAddSample(sample/Det/tensorrt)
+    add_dependencies(detect_tensorrt.run detect)
 
 endif()
 

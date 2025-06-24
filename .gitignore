@@ -16,3 +16,6 @@ lib
 
 # 系统文件
 .DS_Store
+
+# 临时文件
+temp/

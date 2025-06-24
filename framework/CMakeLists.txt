@@ -62,7 +62,7 @@ if (${TARGET_ARCH} STREQUAL "sophgo")
     
     
 
-elseif(${TARGET_ARCH} STREQUAL "nvidia")
+elseif(${TARGET_ARCH} STREQUAL "tensorrt")
     # 使用公版的opencv
     find_package(OpenCV REQUIRED)
     include_directories(${OpenCV_INCLUDE_DIRS})

@@ -41,7 +41,6 @@ enum class yoloType {
 enum class algorithmType {
     DETECT,
     SEGMENTATION,
-    LANDMARK,
     CLASSIFICATION,
     POSE_ESTIMATION,
     UNKNOWN
@@ -49,9 +48,10 @@ enum class algorithmType {
 
 enum class deviceType {
     SOPHGO,
-    NVIDIA,
+    TENSORRT,
     RKNN,
-    CPU
+    CPU,
+    UNKNOWN
 };
 
 enum class resizeType {
