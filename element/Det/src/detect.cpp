@@ -1,7 +1,7 @@
 #include "detect.h"
 
 detect::detect(const std::string& modelPath, const yoloType& type, const int devId)
-              :m_devId(devId), m_model_path(modelPath), m_yoloType(type) {
+              :m_devId(devId), m_model_path(modelPath), m_yoloType(type),m_fpsCounter(std::string(enumName(type)) + "_Detect", 100, 1000.0f)  {
 
     // set algorithm preprocess config
     YOLOConfig yoloConfig = getYOLOConfig(type);
@@ -12,6 +12,11 @@ detect::detect(const std::string& modelPath, const yoloType& type, const int dev
     m_anchors = yoloConfig.anchors;
     m_resizeType = yoloConfig.resize_type;
 
+}
+
+detect::~detect() {
+    auto avgFps = m_fpsCounter.getAvgFps();
+    std::cout << enumName(m_yoloType) << " detection is finished. Average FPS: " << avgFps << std::endl;
 }
 
 algorithmInfo detect::getAlgorithmInfo() {

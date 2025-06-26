@@ -106,6 +106,8 @@ std::vector<detectBoxes> sophgo_detect::process(void* inputImage, const int num)
         ret = postProcess(imageData + m_max_batch*i, outputBoxes, inputNum);
         YOLO_CHECK(ret == stateType::SUCCESS, "postProcess failed inf sophgo_detect::process")
 
+        m_fpsCounter.add(inputNum);
+
     }
 
     return outputBoxes;

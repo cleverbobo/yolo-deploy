@@ -8,6 +8,8 @@
 #include "argparse/argparse.hpp"
 
 int main(int argc, char** argv) {
+    // init logger
+    // logInit("info");
     argparse::ArgumentParser detect_parser("detect");
     detect_parser.add_argument("-m", "--model")
         .required()

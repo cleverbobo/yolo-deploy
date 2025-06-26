@@ -2,13 +2,14 @@
 
 #include <memory>
 #include "yolo_common.h"
+#include "fps_counter.h"
 
 
 
 class detect : public NoCopyable{
 public:
     detect(const std::string& modelPath, const yoloType& type, const int devId = 0);
-    virtual ~detect() = default;
+    virtual ~detect();
 
     virtual std::vector<detectBoxes> process(void* inputImage, const int num) = 0;
 
@@ -42,6 +43,9 @@ protected:
     // postprocess config
     float m_confThreshold= 0.5f;
     float m_nmsThreshold = 0.5f;
+
+    // fps counter
+    fpsCounter m_fpsCounter;
 
 };
 

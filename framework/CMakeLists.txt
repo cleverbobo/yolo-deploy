@@ -56,6 +56,7 @@ if (${TARGET_ARCH} STREQUAL "sophgo")
 
     add_library(utils SHARED
         src/log.cpp
+        src/fps_counter.cpp
         utils/src/utils.cpp)
     # target_link_options(utils PRIVATE "LINKER:-no-undefined")
     target_link_libraries(utils PUBLIC ${OpenCV_LIBS})
@@ -70,6 +71,7 @@ elseif(${TARGET_ARCH} STREQUAL "tensorrt")
 
     add_library(utils SHARED
         src/log.cpp
+        src/fps_counter.cpp
         utils/src/utils.cpp)
     target_link_options(utils PRIVATE "LINKER:-no-undefined")
     target_link_libraries(utils PUBLIC ${OpenCV_LIBS})

@@ -149,6 +149,8 @@ std::vector<detectBoxes> trt_detect::process(void* inputImage, const int num) {
         
         ret = postProcess(imgPtr + m_max_batch*i, outputBoxes, num);
         YOLO_CHECK(ret == stateType::SUCCESS, "TRT Postprocess failed");
+
+        m_fpsCounter.add(inputNum);
     }
     return outputBoxes;
 }
