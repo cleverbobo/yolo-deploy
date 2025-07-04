@@ -39,28 +39,6 @@ class trt_detect : public detect {
         std::vector<int> m_outputSize;
         std::vector<std::unique_ptr<float[]>> m_outputCpuMem;
 
-  
-        // algorithmInfo m_algorithmInfo;
-        // int m_devId = 0;
-        // yoloType m_yoloType;
-
-        // // preprocess config
-        // std::vector<float> m_mean;
-        // std::vector<float> m_std;
-        // bool m_bgr2rgb;
-        // int m_padValue;
-        // resizeType m_resizeType;
-
-        // network config
-        // std::vector<std::string> m_class_names;
-        // int m_class_num;
-        // int m_net_h, m_net_w;
-        // int m_max_batch;
-
-        // postprocess config
-        // float m_confThreshold= 0.5;
-        // float m_nmsThreshold = 0.5;
-        // std::vector<std::vector<std::vector<int>>> m_anchors;
         int m_output_num, m_output_dim, m_nout;
 
         stateType preProcess(const Mat* inputImages, const int num);
