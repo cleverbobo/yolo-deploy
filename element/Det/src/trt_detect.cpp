@@ -82,18 +82,6 @@ trt_detect::trt_detect(const std::string& modelPath, const yoloType& type, const
 
     }
 
-    // 申请输出的物理内存
-
-
-    // 配置 preprocess config
-    // auto yoloConfig = getYOLOConfig(m_yoloType);
-    // m_mean = yoloConfig.mean;
-    // m_std = yoloConfig.std;
-    // m_bgr2rgb = yoloConfig.bgr2rgb;
-    // m_padValue = yoloConfig.padValue;
-    // m_anchors = yoloConfig.anchors;
-    // m_resizeType = yoloConfig.resize_type;
-
     // 配置network config
     m_max_batch = m_trtEngine->getTensorShape(m_inputNames[0]).d[0];
     m_net_h = m_trtEngine->getTensorShape(m_inputNames[0]).d[2];
@@ -155,44 +143,6 @@ std::vector<detectBoxes> trt_detect::process(void* inputImage, const int num) {
     return outputBoxes;
 }
 
-// algorithmInfo trt_detect::getAlgorithmInfo(){
-//     return m_algorithmInfo;
-// }
-
-// void trt_detect::printAlgorithmInfo() {
-//     std::cout << "----------------AlgorithmInfo-----------------" << std::endl;
-//     std::cout << "YOLO Type: " << enumName(m_yoloType) << std::endl;
-//     std::cout << "Device Type: " << enumName(m_deviceType) << std::endl;
-//     std::cout << "Algorithm Type: " << enumName(m_algorithmInfo.algorithm_type) << std::endl;
-//     std::cout << "Input Shape: ";
-//     for (const auto& shape : m_algorithmInfo.input_shape) {
-//         std::cout << "[";
-//         for (const auto& dim : shape) {
-//             std::cout << dim << " ";
-//         }
-//         std::cout << "] ";
-//     }
-//     std::cout << std::endl;
-
-//     std::cout << "Output Shape: ";
-//     for (const auto& shape : m_algorithmInfo.output_shape) {
-//         std::cout << "[";        
-//         for (const auto& dim : shape) {
-//             std::cout << dim << " ";
-//         }
-//         std::cout << "] ";
-//     }
-//     std::cout << std::endl;
-//     std::cout << "Batch Size: " << m_algorithmInfo.batch_size << std::endl;
-//     std::cout << "----------------AlgorithmInfo-----------------" << std::endl;
-// }
-
-// stateType trt_detect::resetAnchor(std::vector<std::vector<std::vector<int>>> anchors) {
-//     m_anchors = anchors;
-//     return stateType::SUCCESS;
-// }
-
-
 
 stateType trt_detect::preProcess(const Mat* inputImages, const int num){
     for (int i = 0; i < num; ++i) {
@@ -233,6 +183,27 @@ stateType trt_detect::postProcess(const Mat* inputImages, std::vector<detectBoxe
     switch (m_yoloType) {
         case yoloType::YOLOV5:
             ret = yolov5Post(inputImages, outputBoxes, num);
+            break;
+        case yoloType::YOLOV6:
+            ret = yolov6Post(inputImages, outputBoxes, num);
+            break;
+        case yoloType::YOLOV7:
+            ret = yolov7Post(inputImages, outputBoxes, num);
+            break;
+        case yoloType::YOLOV8:
+            ret = yolov8Post(inputImages, outputBoxes, num);
+            break;
+        case yoloType::YOLOV9:
+            ret = yolov9Post(inputImages, outputBoxes, num);
+            break;
+        case yoloType::YOLOV10:
+            ret = yolov10Post(inputImages, outputBoxes, num);
+            break;
+        case yoloType::YOLOV11:
+            ret = yolov11Post(inputImages, outputBoxes, num);
+            break;
+        case yoloType::YOLOV12:
+            ret = yolov12Post(inputImages, outputBoxes, num);
             break;
         default:
             ret = stateType::UNMATCH_YOLO_TYPE_ERROR;
@@ -460,4 +431,279 @@ stateType trt_detect::yolov5Post(const Mat* inputImages, std::vector<detectBoxes
       outputBoxes.push_back(resVec);
     }
     return stateType::SUCCESS;
+}
+
+stateType trt_detect::yolov6Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num) {
+    for (int i = 0; i < m_outputMem.size(); ++i) {
+        cudaMemcpyAsync(m_outputCpuMem[i].get(), m_outputMem[i], m_outputSize[i], cudaMemcpyDeviceToHost, m_stream);
+    }
+    // 同步数据
+    cudaStreamSynchronize(m_stream);
+
+    for(int batch_idx = 0; batch_idx < num; ++batch_idx) {
+        detectBoxes yolobox_vec;
+
+        auto output_shape = m_trtEngine->getTensorShape(m_outputNames[0]);
+        YOLO_CHECK(output_shape.nbDims == 3, "The {} output's dim must be three. which means to [batch, box_num, feature]",enumName(m_yoloType));
+        int box_num = output_shape.d[1];
+
+        #if USE_MULTICLASS_NMS
+            int out_nout = m_nout;
+        #else
+            int out_nout = 7;
+        #endif
+        
+        float *batch_output_data = m_outputCpuMem[0].get() + batch_idx * box_num * m_nout;
+        int max_wh = 7680;
+        bool agnostic = false;
+        for(int i = 0; i < box_num; ++i) {
+            float score = batch_output_data[4];
+            if (score < m_confThreshold) {
+                batch_output_data += m_nout;
+                continue;
+            }
+            #if USE_MULTICLASS_NMS
+                for (int j = 0; j < m_class_num; ++j) {
+                    float confidence = batch_output_data[j + 5];
+                    int class_id = j;
+                    if (confidence * score > m_confThreshold) {
+                        center_x = batch_output_data[0];
+                        center_y = batch_output_data[1];
+                        width = batch_output_data[2];
+                        height = batch_output_data[3];
+                    }
+                    detectBox box;
+
+                    box.left = center_x - width / 2;
+                    box.top = center_y - height / 2;
+                    box.right = box.left + width;
+                    box.bottom = box.top + height;  
+                    box.classId = class_id;
+                    box.score = confidence * score;
+
+                    if (!agnostic) {
+                        box.left += class_id * max_wh;
+                        box.top += class_id * max_wh;
+                        box.right += class_id * max_wh;
+                        box.bottom += class_id * max_wh;
+                    }
+                    yolobox_vec.push_back(box);
+                    
+                }
+            #else
+                int class_id = argmax(batch_output_data + 5, m_class_num);
+                float confidence = batch_output_data[5 + class_id];
+                if (confidence * score > m_confThreshold) {
+                    float center_x = batch_output_data[0];
+                    float center_y = batch_output_data[1];
+                    float width = batch_output_data[2];
+                    float height = batch_output_data[3];
+
+                    detectBox box;
+                    box.left = center_x - width / 2;
+                    box.top = center_y - height / 2;
+                    box.right = box.left + width;
+                    box.bottom = box.top + height;
+                    
+                    if (!agnostic) {
+                        box.left += class_id * max_wh;
+                        box.top += class_id * max_wh;
+                        box.right += class_id * max_wh;
+                        box.bottom += class_id * max_wh;
+                    }
+                    box.classId = class_id;
+                    box.score = confidence * score;
+
+                    yolobox_vec.push_back(box);
+                }
+                batch_output_data += m_nout;
+        
+            #endif
+        }
+        detectBoxes resVec;
+        NMS(yolobox_vec, resVec, m_nmsThreshold);
+      for (auto& box : resVec){
+          if (!agnostic){
+              box.left -= box.classId * max_wh;
+              box.top -= box.classId * max_wh;
+              box.right -= box.classId * max_wh;
+              box.bottom -= box.classId * max_wh;
+          }
+      }
+      resizeBox(inputImages+batch_idx, resVec);
+      for (auto& box:resVec) {
+        restrictBox(box, inputImages[batch_idx].cols, inputImages[batch_idx].rows);
+      }
+      YOLO_DEBUG("batch_id: {}, outputbox number is {}", batch_idx, resVec.size());
+      outputBoxes.push_back(resVec);
+    }
+    return stateType::SUCCESS;
+
+
+
+}
+
+stateType trt_detect::yolov7Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num) {
+    return yolov5Post(inputImages, outputBoxes, num);
+}
+
+stateType trt_detect::yolov8Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num) {
+    for (int i = 0; i < m_outputMem.size(); ++i) {
+        cudaMemcpyAsync(m_outputCpuMem[i].get(), m_outputMem[i], m_outputSize[i], cudaMemcpyDeviceToHost, m_stream);
+    }
+    // 同步数据
+    cudaStreamSynchronize(m_stream);
+    for(int batch_idx = 0; batch_idx < num; ++batch_idx) {
+        detectBoxes yolobox_vec;
+
+        auto output_shape = m_trtEngine->getTensorShape(m_outputNames[0]);
+        YOLO_CHECK(output_shape.nbDims == 3, "The {} output's dim must be three. which means to [batch, box_num, feature]",enumName(m_yoloType));
+        int box_num = output_shape.d[1];
+
+        #if USE_MULTICLASS_NMS
+            int out_nout = m_nout;
+        #else
+            int out_nout = 7;
+        #endif
+        
+        float *batch_output_data = m_outputCpuMem[0].get() + batch_idx * box_num * m_nout;
+        int max_wh = 7680;
+        bool agnostic = false;
+        for(int i = 0; i < box_num; ++i) {
+            #if USE_MULTICLASS_NMS
+                for (int j = 0; j < m_class_num; ++j) {
+                    float confidence = batch_output_data[j + 4];
+                    int class_id = j;
+                    if (confidence > m_confThreshold) {
+                        center_x = batch_output_data[0];
+                        center_y = batch_output_data[1];
+                        width = batch_output_data[2];
+                        height = batch_output_data[3];
+                    }
+                    detectBox box;
+
+                    box.left = center_x - width / 2;
+                    box.top = center_y - height / 2;
+                    box.right = box.left + width;
+                    box.bottom = box.top + height;  
+                    box.classId = class_id;
+                    box.score = confidence;
+
+                    if (!agnostic) {
+                        box.left += class_id * max_wh;
+                        box.top += class_id * max_wh;
+                        box.right += class_id * max_wh;
+                        box.bottom += class_id * max_wh;
+                    }
+                    yolobox_vec.push_back(box);
+                    
+                }
+            #else
+                int class_id = argmax(batch_output_data + 4, m_class_num);
+                float confidence = batch_output_data[4 + class_id];
+                if (confidence > m_confThreshold) {
+                    float center_x = batch_output_data[0];
+                    float center_y = batch_output_data[1];
+                    float width = batch_output_data[2];
+                    float height = batch_output_data[3];
+
+                    detectBox box;
+                    box.left = center_x - width / 2;
+                    box.top = center_y - height / 2;
+                    box.right = box.left + width;
+                    box.bottom = box.top + height;
+                    
+                    if (!agnostic) {
+                        box.left += class_id * max_wh;
+                        box.top += class_id * max_wh;
+                        box.right += class_id * max_wh;
+                        box.bottom += class_id * max_wh;
+                    }
+                    box.classId = class_id;
+                    box.score = confidence;
+
+                    yolobox_vec.push_back(box);
+                }
+                batch_output_data += m_nout;
+        
+            #endif
+        }
+
+        detectBoxes resVec;
+        NMS(yolobox_vec, resVec, m_nmsThreshold);
+        for (auto& box : resVec){
+            if (!agnostic){
+                box.left -= box.classId * max_wh;
+                box.top -= box.classId * max_wh;
+                box.right -= box.classId * max_wh;
+                box.bottom -= box.classId * max_wh;
+            }
+        }
+        resizeBox(inputImages+batch_idx, resVec);
+        for (auto& box:resVec) {
+            restrictBox(box, inputImages[batch_idx].cols, inputImages[batch_idx].rows);
+        }
+        YOLO_DEBUG("batch_id: {}, outputbox number is {}", batch_idx, resVec.size());
+        outputBoxes.push_back(resVec);
+    }
+    return stateType::SUCCESS;
+}
+
+stateType trt_detect::yolov9Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num) {
+    return yolov8Post(inputImages, outputBoxes, num);
+}
+
+stateType trt_detect::yolov10Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num) {
+    for (int i = 0; i < m_outputMem.size(); ++i) {
+        cudaMemcpyAsync(m_outputCpuMem[i].get(), m_outputMem[i], m_outputSize[i], cudaMemcpyDeviceToHost, m_stream);
+    }
+    // 同步数据
+    cudaStreamSynchronize(m_stream);
+
+    for(int batch_idx = 0; batch_idx < num; ++batch_idx) {
+        detectBoxes yolobox_vec;
+
+        auto output_shape = m_trtEngine->getTensorShape(m_outputNames[0]);
+        YOLO_CHECK(output_shape.nbDims == 3, "The {} output's dim must be three. which means to [batch, box_num, feature]",enumName(m_yoloType));
+        int box_num = output_shape.d[1];
+
+        // YOLOv10 only has one label
+        int out_nout = 6;
+
+        
+        float *batch_output_data = m_outputCpuMem[0].get() + batch_idx * box_num * m_nout;
+        for(int i = 0; i < box_num; ++i) {
+            if(batch_output_data[4] < m_confThreshold) {
+                break;
+            }
+
+            detectBox box;
+            box.left = batch_output_data[0];
+            box.top = batch_output_data[1];
+            box.right = batch_output_data[2];
+            box.bottom = batch_output_data[3];
+            box.classId =  batch_output_data[5];
+            box.score = batch_output_data[4];
+
+            yolobox_vec.push_back(box);
+            batch_output_data += out_nout;
+        }
+
+        resizeBox(inputImages+batch_idx, yolobox_vec);
+        for (auto& box:yolobox_vec) {
+            restrictBox(box, inputImages[batch_idx].cols, inputImages[batch_idx].rows);
+        }
+        YOLO_DEBUG("batch_id: {}, outputbox number is {}", batch_idx, yolobox_vec.size());
+        outputBoxes.push_back(yolobox_vec);
+    }
+    return stateType::SUCCESS;
+
+}
+
+stateType trt_detect::yolov11Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num) {
+    return yolov8Post(inputImages, outputBoxes, num);
+}
+
+stateType trt_detect::yolov12Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num) {
+    return yolov8Post(inputImages, outputBoxes, num);
 }

@@ -48,6 +48,13 @@ class trt_detect : public detect {
         int get_element_size(const nvinfer1::DataType& type) const;
         stateType resizeBox(const Mat*  inputImages, detectBoxes& outputBoxes);
         stateType yolov5Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num);
+        stateType yolov6Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num);
+        stateType yolov7Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num);
+        stateType yolov8Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num);
+        stateType yolov9Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num);
+        stateType yolov10Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num);
+        stateType yolov11Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num);
+        stateType yolov12Post(const Mat* inputImages, std::vector<detectBoxes>& outputBoxes, const int num);
 
 };
 

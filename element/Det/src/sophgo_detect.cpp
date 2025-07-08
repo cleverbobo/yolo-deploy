@@ -597,7 +597,7 @@ stateType sophgo_detect::yolov10Post(const bm_image* inputImages, std::vector<de
     std::shared_ptr<BMNNTensor> output_tensor = m_bmNetwork->outputTensor(0);
     float* output_data = reinterpret_cast<float*>(output_tensor->get_cpu_data());
 
-        for(int batch_idx = 0; batch_idx < num; ++batch_idx) {
+    for(int batch_idx = 0; batch_idx < num; ++batch_idx) {
         detectBoxes yolobox_vec;
 
         auto output_shape = output_tensor->get_shape();
