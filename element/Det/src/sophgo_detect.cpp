@@ -225,7 +225,7 @@ stateType sophgo_detect::yolov5Post(const bm_image* inputImages, std::vector<det
       for(int i=0; i<m_output_num; i++){
         auto output_shape = m_bmNetwork->outputTensor(i)->get_shape();
         auto output_dims = output_shape->num_dims;
-        YOLO_CHECK(output_dims == 5, "The Yolov5 output's dim must be five. which means to [batch, anchor_num, feature_height,feature_width,feature]")
+        YOLO_CHECK(output_dims == 5, "The output's dim must be five. which means to [batch, anchor_num, feature_height,feature_width,feature]",enumName(m_yoloType));
         box_num += output_shape->dims[1] * output_shape->dims[2] * output_shape->dims[3];
       }
   
@@ -388,7 +388,7 @@ stateType sophgo_detect::yolov6Post(const bm_image* inputImages, std::vector<det
         detectBoxes yolobox_vec;
 
         auto output_shape = output_tensor->get_shape();
-        YOLO_CHECK(output_shape->num_dims == 3, "The Yolov6 output's dim must be three. which means to [batch, box_num, feature]");
+        YOLO_CHECK(output_shape->num_dims == 3, "The {} output's dim must be three. which means to [batch, box_num, feature]",enumName(m_yoloType));
         int box_num = output_tensor->get_shape()->dims[1];
 
         #if USE_MULTICLASS_NMS
@@ -496,7 +496,7 @@ stateType sophgo_detect::yolov8Post(const bm_image* inputImages, std::vector<det
         detectBoxes yolobox_vec;
 
         auto output_shape = output_tensor->get_shape();
-        YOLO_CHECK(output_shape->num_dims == 3, "The Yolov8 output's dim must be three. which means to [batch, box_num, feature]");
+        YOLO_CHECK(output_shape->num_dims == 3, "The {} output's dim must be three. which means to [batch, box_num, feature]",enumName(m_yoloType));
         int box_num = output_tensor->get_shape()->dims[1];
 
         #if USE_MULTICLASS_NMS
@@ -601,7 +601,7 @@ stateType sophgo_detect::yolov10Post(const bm_image* inputImages, std::vector<de
         detectBoxes yolobox_vec;
 
         auto output_shape = output_tensor->get_shape();
-        YOLO_CHECK(output_shape->num_dims == 3, "The Yolov10 output's dim must be three. which means to [batch, box_num, feature]");
+        YOLO_CHECK(output_shape->num_dims == 3, "The {} output's dim must be three. which means to [batch, box_num, feature]", enumName(m_yoloType));
         int box_num = output_tensor->get_shape()->dims[1];
 
         // YOLOv10 only has one label
