@@ -33,5 +33,13 @@ class sophgo_detect : public detect {
         
         stateType resizeBox(const bm_image* inputImages, detectBoxes& outputBoxes);
         stateType yolov5Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num);
+        stateType yolov6Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num);
+        stateType yolov7Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num);
+        stateType yolov8Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num);
+        stateType yolov9Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num);
+        stateType yolov10Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num);
+        stateType yolov11Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num);
+        stateType yolov12Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num);
+
     };
     

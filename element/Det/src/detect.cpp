@@ -121,3 +121,14 @@ void detect::resetPreprocessConfig(const std::vector<float>& mean, const std::ve
     m_resizeType = resizeType;
 }
 
+void detect::resetClassNames(const std::vector<std::string>& class_names) {
+    m_class_names = class_names;
+    if(m_class_num && m_class_num != class_names.size()) {
+        YOLO_WARN("Class names are already set. Old num [{}] vs new num [{}]. Resetting class names will overwrite the previous ones. ",
+                  m_class_num, class_names.size());
+        YOLO_WARN("It may cause unexpected behavior if the model is not compatible with the new class number.");
+        m_class_num = class_names.size();
+    }
+    
+}
+

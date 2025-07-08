@@ -13,6 +13,20 @@ float sigmoid(float x) {
     return 1.0 / (1 + expf(-x));
 }
 
+int argmax(const float* data, int length) {
+    if (length <= 0 || data == nullptr) return -1; // 错误处理
+    int max_idx = 0;
+    float max_val = data[0];
+    for (int i = 1; i < length; ++i) {
+        if (data[i] > max_val) {
+            max_val = data[i];
+            max_idx = i;
+        }
+    }
+    return max_idx;
+}
+
+
 // algorithm functions
 void NMS(detectBoxes& inputBox, detectBoxes& outputBox, float nmsThreshold) {
     if (inputBox.empty()) {
@@ -123,6 +137,16 @@ cv::Mat letterbox(const cv::Mat& src, const cv::Size& dst_shape,
     cv::copyMakeBorder(resized, out, pad_top, pad_h - pad_top, pad_left, pad_w - pad_left, 
                        cv::BORDER_CONSTANT, color);
     return out;
+}
+
+void restrictBox(detectBox& box, const int img_w, const int img_h){
+    box.left = std::min(std::max(0, box.left),img_w - 1);
+    box.top = std::min(std::max(0, box.top),img_h - 1);
+    box.right = std::min(std::max(0, box.right),img_w);
+    box.bottom = std::min(std::max(0, box.bottom),img_h);
+
+    box.width = std::max(box.right - box.left,0);
+    box.height = std::max(box.bottom - box.top,0);
 }
 
 // draw functions only for debug

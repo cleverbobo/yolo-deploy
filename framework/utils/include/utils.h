@@ -18,12 +18,15 @@ namespace cv {
 
 // math functions
 float sigmoid(float x);
+int argmax(const float* data, int length);
 
 // algorithm functions
 void NMS(detectBoxes& inputBox, detectBoxes& outputBox, float nmsThreshold);
 void getAspectParam(int src_w, int src_h, int dst_w, int dst_h, 
                     int& dx, int& dy, float& scale_x, float& scale_y, resizeType type);
 cv::Mat letterbox(const cv::Mat& src, const cv::Size& dst_shape,const cv::Scalar& color);
+
+void restrictBox(detectBox& box, const int img_w, const int img_h);
 
 // draw functions only for debug
 void drawBox(detectBoxes& boxes, cv::Mat& img, std::string outputName, std::string outputDirPath = "./detect_result");

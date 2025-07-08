@@ -19,6 +19,7 @@ public:
     virtual void resetConf(const float detConf, const float nmsConf);
     virtual void resetPreprocessConfig(const std::vector<float>& mean = {0.0f, 0.0f, 0.0f}, const std::vector<float>& std = {1.0f/255, 1.0f/255, 1.0f/255}, 
                                        const bool bgr2rgb = true, const int padValue = 114, const resizeType& resizeType = resizeType::RESIZE_CENTER_PAD);
+    virtual void resetClassNames(const std::vector<std::string>& class_names);
 
 protected:
     std::string m_model_path;
@@ -29,7 +30,7 @@ protected:
 
     // network config
     std::vector<std::string> m_class_names;
-    int m_class_num;
+    int m_class_num = 0;
     int m_net_h, m_net_w;
     int m_max_batch;
 

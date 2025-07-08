@@ -15,6 +15,11 @@ int main(int argc, char** argv) {
         .required()
         .help("Path to your model file")
         .default_value(std::string("./yolov5.bmodel"));
+    
+    detect_parser.add_argument("-t", "--yoloType")
+        .required()
+        .help("Type of YOLO model, default is YOLOV5")
+        .default_value(std::string("YOLOV5"));
 
     detect_parser.add_argument("-i", "--input")
         .required()
@@ -50,9 +55,12 @@ int main(int argc, char** argv) {
 
     // init dectect function
     std::shared_ptr<detect_factory> factory = std::make_shared<sophgo_detect_factory>();
-    std::shared_ptr<detect> detect = factory->getInstance(modelPath, yoloType::YOLOV5, 0);
 
+    yoloType detectYoloType = enumYoloType(detect_parser.get<std::string>("--yoloType"));
+    YOLO_CHECK(detectYoloType != yoloType::UNKNOWN, "Unmatch yolo type: " + detect_parser.get<std::string>("--yoloType"));
+    std::shared_ptr<detect> detect = factory->getInstance(modelPath, detectYoloType, 0);
 
+    
     decoder dec(0);
     std::vector<nlohmann::ordered_json> resBoxJsonVec;
     switch (inputType) {

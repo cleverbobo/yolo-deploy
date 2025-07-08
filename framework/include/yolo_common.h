@@ -12,6 +12,7 @@
 
 #define enumName(expr) magic_enum::enum_name(expr) 
 
+
 inline std::string concatArgs() { return ""; }
 
 template <typename T, typename... Args>
@@ -35,8 +36,14 @@ enum class yoloType {
     YOLOV5,
     YOLOV6,
     YOLOV7,
-    YOLOV8
+    YOLOV8,
+    YOLOV9,
+    YOLOV10,
+    YOLOV11,
+    YOLOV12,
+    UNKNOWN
 };
+#define enumYoloType(expr) magic_enum::enum_cast<yoloType>(expr).value_or(yoloType::UNKNOWN)
 
 enum class algorithmType {
     DETECT,
@@ -88,6 +95,14 @@ inline YOLOConfig getYOLOConfig(yoloType type) {
     switch (type) {
         case yoloType::YOLOV5:
             break;
+        case yoloType::YOLOV6:
+            break;
+        case yoloType::YOLOV7:
+            config.anchors = {
+                {{12,16}, {19,36}, {40,28}},
+                {{36,75}, {76,55}, {72,146}},
+                {{142,110}, {192,243}, {459,401}}
+            };
         default:
             break;
     }
