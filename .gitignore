@@ -19,3 +19,6 @@ lib
 
 # 临时文件
 temp/
+
+# 模型文件
+models/
