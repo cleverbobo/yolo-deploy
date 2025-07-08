@@ -18,6 +18,11 @@ int main(int argc, char** argv) {
         .help("Path to your input file Path. Support jpg, vide0(h264/h265), rtsp/rtmp, video_device")
         .default_value(std::string("./test.jpg"));
     
+    detect_parser.add_argument("-t", "--yoloType")
+        .required()
+        .help("Type of YOLO model, default is YOLOV5")
+        .default_value(std::string("YOLOV5"));
+    
     detect_parser.add_argument("-d", "--deviceId")
         .help("Device id, default is 0")
         .default_value(0)
@@ -47,7 +52,9 @@ int main(int argc, char** argv) {
 
     // init dectect function
     std::shared_ptr<detect_factory> factory = std::make_shared<trt_detect_factory>();
-    std::shared_ptr<detect> detect = factory->getInstance(modelPath, yoloType::YOLOV5, 0);
+    yoloType detectYoloType = enumYoloType(detect_parser.get<std::string>("--yoloType"));
+    YOLO_CHECK(detectYoloType != yoloType::UNKNOWN, "Unmatch yolo type: " + detect_parser.get<std::string>("--yoloType"));
+    std::shared_ptr<detect> detect = factory->getInstance(modelPath, detectYoloType, 0);
 
 
 
