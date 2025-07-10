@@ -15,6 +15,7 @@ class fpsCounter : public NoCopyable {
         void add(int count = 1);
         float getTempFps();
         float getAvgFps();
+        void summary();
         
     private:
         float m_tempFps;
@@ -29,5 +30,5 @@ class fpsCounter : public NoCopyable {
         // 最小的统计时长，单位ms
         float m_condTimes = 10.0f;
 
-        void summary();
+        
 };
