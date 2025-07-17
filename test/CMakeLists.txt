@@ -8,6 +8,10 @@ if (NOT DEFINED TARGET_ARCH)
     set(TARGET_ARCH sophgo)
 endif()
 
+set(CMAKE_BUILD_TYPE Debug)
+# 编译优化O0
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
+
 message(STATUS "[INFO] BUILD TEST CASE FOR TARGET_ARCH: ${TARGET_ARCH}")
 
 if (${TARGET_ARCH} STREQUAL "sophgo")
@@ -41,16 +45,25 @@ if (${TARGET_ARCH} STREQUAL "sophgo")
     # 3rdparty include
     include_directories(../3rdparty/argarse-3.2/include)
     include_directories(../3rdparty/spdlog-1.15.3/include)
+    include_directories(../3rdparty/magic_enum/include)
 
     # yolo-deploy include
     include_directories(../framework/include)
     include_directories(../framework/sophgo_framework/include)
     include_directories(../framework/utils/include)
 
+    # src find path
+    file(GLOB SRC_FILES "../framework/src/*.cpp")
+
 
     # test case binary
-    add_executable(test_case_log test_log.cpp)
-    add_executable(test_case_check test_check.cpp)
+    add_executable(test_case_log ${SRC_FILES} test_log.cpp)
+    add_executable(test_case_check ${SRC_FILES} test_check.cpp)
+    add_executable(test_case_threadpool ${SRC_FILES} test_threadpool.cpp)
+
+
+    # target link libraries
+    target_link_libraries(test_case_threadpool -pthread)
 
 elseif(${TARGET_ARCH} STREQUAL "soc")
 
