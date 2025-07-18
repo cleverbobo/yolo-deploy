@@ -40,8 +40,6 @@ if (${TARGET_ARCH} STREQUAL "sophgo")
     include_directories(${LIBSOPHON_INCLUDE_DIRS})
     link_directories(${LIBSOPHON_LIB_DIRS})
 
-    include_directories(../../../framework/sophgo_framework/include)
-
     add_executable(detect_sophgo.run detect.cpp)
     target_link_libraries(detect_sophgo.run ${OpenCV_LIBS} -ldetect -lsophgo_framework -lutils)
 

@@ -112,9 +112,16 @@ inline YOLOConfig getYOLOConfig(yoloType type) {
 enum class stateType {
 
     SUCCESS = 0,
+    QUEUE_FULL = 1000,
+    QUEUE_EMPTY,
+    QUEUE_STOPPED,
+    UNORDERMAP_FULL,
+    UNORDERMAP_EMPTY,
+    UNORDERMAP_STOPPED,
+    THREADPOOL_STOPPED,
     ERROR = 5001,
     INFERENCE_ERROR,
-    UNMATCH_YOLO_TYPE_ERROR
+    UNMATCH_YOLO_TYPE_ERROR,
 };
 
 template <>

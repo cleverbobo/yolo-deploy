@@ -10,7 +10,10 @@
 
 
 
-sophgo_detect::sophgo_detect(const std::string& modelPath, const yoloType& type, const int devId):detect(modelPath, type, devId) {
+sophgo_detect::sophgo_detect(const std::string& modelPath, const yoloType& type, const int devId):detect(modelPath, type, devId):
+    m_thead_preprocess(ThreadPool(2,10,10)),
+    m_thead_inference(ThreadPool<BMNNTensor>(1,10,10)),
+    m_thead_postprocess(ThreadPool<detectBoxes>(2,10,10)) {
 
     // init handle
     m_handle = std::make_shared<BMNNHandle>(m_devId);
@@ -22,55 +25,34 @@ sophgo_detect::sophgo_detect(const std::string& modelPath, const yoloType& type,
     // init network
     m_bmNetwork = m_bmContext->network(0);
     
-    // init preprocess
-    auto tensor = m_bmNetwork->inputTensor(0);
-    m_net_h = tensor->get_shape()->dims[2];
-    m_net_w = tensor->get_shape()->dims[3];
-
-
-    // init postprocess
+    // init network config
+    auto input_shapes = m_bmNetwork->input_shapes();
+    m_net_h = input_shapes[0][2];
+    m_net_w = input_shapes[0][3];
     m_max_batch = m_bmNetwork->maxBatch();
-    auto output_tensor = m_bmNetwork->outputTensor(0);
+    auto output_shapes = m_bmNetwork->output_shapes();
     
     m_output_num = m_bmNetwork->outputTensorNum();
-    m_output_dim = output_tensor->get_shape()->num_dims;
-    m_nout = output_tensor->get_shape()->dims[m_output_dim-1];
+    m_output_dim = output_shapes[0].size();
+    m_nout = output_shapes[0][m_output_dim-1];
     m_class_num = m_nout - 5;
 
-    // init preprocess data
-    m_preprocess_images.resize(m_max_batch);
-    bm_image_format_ext image_format = m_bgr2rgb ? FORMAT_RGB_PLANAR : FORMAT_BGR_PLANAR;
-    bm_image_data_format_ext data_formate = tensor->get_dtype() == BM_UINT8 ? DATA_TYPE_EXT_1N_BYTE : DATA_TYPE_EXT_FLOAT32;
-    for (auto& image : m_preprocess_images) {
-        auto ret = bm_image_create(h, m_net_h, m_net_w, image_format, data_formate, &image);
-    }
-    auto ret = bm_image_alloc_contiguous_mem(m_max_batch, m_preprocess_images.data());
-    YOLO_CHECK(ret == BM_SUCCESS, "bm_image_alloc_contiguous_mem failed in sophgo_detect::sophgo_detect!");
-
     // init m_algorithmInfo
-    std::vector<std::vector<int>> input_shape;
-    for (int i = 0; i < m_bmNetwork -> inputTensorNum(); ++i) {
-        auto input_tensor = m_bmNetwork->inputTensor(i);
-        input_shape.push_back(input_tensor->get_shape_vector());
-    }
-    std::vector<std::vector<int>> output_shape;
-    for (int i = 0; i < m_bmNetwork -> outputTensorNum(); ++i) {
-        auto output_tensor = m_bmNetwork->outputTensor(i);
-        output_shape.push_back(output_tensor->get_shape_vector());
-    }
     m_algorithmInfo = algorithmInfo{ m_yoloType,
                                      algorithmType::DETECT,
                                      deviceType::SOPHGO,
-                                     input_shape,
-                                     output_shape,
+                                     input_shapes,
+                                     output_shapes,
                                      m_max_batch };
+
+    // init threadpool
+    
 }
 
 sophgo_detect::~sophgo_detect() {
-    bm_image_free_contiguous_mem(m_max_batch, m_preprocess_images.data());
-    for (auto& image : m_preprocess_images) {
-        auto ret = bm_image_destroy(image);
-    }
+    m_thead_preprocess.shutdown();
+    m_thead_inference.shutdown();
+    m_thead_postprocess.shutdown();
 }
 
 std::vector<detectBoxes> sophgo_detect::process(void* inputImage, const int num) {
@@ -82,6 +64,8 @@ std::vector<detectBoxes> sophgo_detect::process(void* inputImage, const int num)
 
     for (int i = 0; i < calculateTime; ++i) {
         int inputNum = std::min(num - i * m_max_batch, m_max_batch);
+
+        
 
         // preprocess
         ret = preProcess(imageData + m_max_batch*i, inputNum);
@@ -103,11 +87,20 @@ std::vector<detectBoxes> sophgo_detect::process(void* inputImage, const int num)
 }
 
 
-stateType sophgo_detect::preProcess(bm_image* inputImages, const int num){
+
+
+stateType sophgo_detect::preProcess(bm_image* inputImages, bm_image* outputImages, const int num) {
     auto handle = m_handle->handle();
 
     std::vector<bmcv_padding_atrr_t> padding_attrs(num);
     std::vector<bmcv_rect_t> crop_rects(num);
+
+    std::vector<bm_image> outputImagesVec(num);
+    bm_image_format_ext image_format = m_bgr2rgb ? FORMAT_RGB_PLANAR : FORMAT_BGR_PLANAR;
+    bm_image_data_format_ext data_formate = m_bmNetwork->input_dtypes()[0] == BM_UINT8 ? DATA_TYPE_EXT_1N_BYTE : DATA_TYPE_EXT_FLOAT32;
+    for (auto& image : outputImagesVec) {
+        auto ret = bm_image_create(handle, m_net_h, m_net_w, image_format, data_formate, &image);
+    }
 
     for(int i = 0; i < num; ++i){
         bm_image img = *(inputImages+i);
@@ -128,51 +121,59 @@ stateType sophgo_detect::preProcess(bm_image* inputImages, const int num){
         crop_rects[i] = {0,0,img_w,img_h};
 
     }
-    auto ret = bmcv_image_vpp_basic(handle, num, inputImages, m_preprocess_images.data(),
+    auto ret = bmcv_image_vpp_basic(handle, num, inputImages, outputImages,
                                     NULL, NULL, padding_attrs.data(), BMCV_INTER_LINEAR);
     YOLO_CHECK(ret == BM_SUCCESS, "bmcv_image_vpp_basic failed in sophgo_detect::preProcess");
 
     // attach to tensor
-    bm_device_mem_t input_dev_mem;
-    auto num_ = num != m_max_batch ? m_max_batch : num;
-    bm_image_get_contiguous_device_mem(num_, m_preprocess_images.data(), &input_dev_mem);
-    std::shared_ptr<BMNNTensor> input_tensor = m_bmNetwork->inputTensor(0);
-    input_tensor->set_device_mem(&input_dev_mem);
+    // bm_device_mem_t input_dev_mem;
+    // auto num_ = num != m_max_batch ? m_max_batch : num;
+    // bm_image_get_contiguous_device_mem(num_, m_preprocess_images.data(), &input_dev_mem);
+    // outputTensors.set_device_mem(&input_dev_mem);
     return stateType::SUCCESS;
 }
 
-stateType sophgo_detect::inference(){
-    auto ret = m_bmNetwork->forward();
-    return ret == BM_SUCCESS ? stateType::SUCCESS : stateType::INFERENCE_ERROR;
+stateType sophgo_detect::inference(bm_image* inputImage, std::vector<BMNNTensor>& outputTensors, int num) {
+    BMNNTensor inputTensor;
+    bm_device_mem_t input_dev_mem;
+    bm_image_get_contiguous_device_mem(num, inputImage, &input_dev_mem);
+    inputTensor.set_device_mem(&input_dev_mem);
+
+    outputTensors = m_bmNetwork->forward(&inputTensor, num);
+
+    for (int i = 0; i < m_output_num; ++i) {
+        bm_image_destroy(*inputImage);
+    }
+    return stateType::SUCCESS;
 
 }
 
-stateType sophgo_detect::postProcess(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num){
+stateType sophgo_detect::postProcess(const bm_image* inputImages, std::vector<BMNNTensor>& outputTensors, std::vector<detectBoxes>& outputBoxes, const int num){
     auto ret = stateType::SUCCESS;
     switch (m_yoloType) {
         case yoloType::YOLOV5:
-            ret = yolov5Post(inputImages, outputBoxes, num);
+            ret = yolov5Post(inputImages, outputTensors, outputBoxes, num);
             break;
         case yoloType::YOLOV6:
-            ret = yolov6Post(inputImages, outputBoxes, num);
+            ret = yolov6Post(inputImages, outputTensors, outputBoxes, num);
             break;
         case yoloType::YOLOV7:
-            ret = yolov7Post(inputImages, outputBoxes, num);
+            ret = yolov7Post(inputImages, outputTensors, outputBoxes, num);
             break; 
         case yoloType::YOLOV8:
-            ret = yolov8Post(inputImages, outputBoxes, num);
+            ret = yolov8Post(inputImages, outputTensors, outputBoxes, num);
             break;
         case yoloType::YOLOV9:
-            ret = yolov9Post(inputImages, outputBoxes, num);
+            ret = yolov9Post(inputImages, outputTensors, outputBoxes, num);
             break;
         case yoloType::YOLOV10:
-            ret = yolov10Post(inputImages, outputBoxes, num);
+            ret = yolov10Post(inputImages, outputTensors, outputBoxes, num);
             break;
         case yoloType::YOLOV11:
-            ret = yolov11Post(inputImages, outputBoxes, num);
+            ret = yolov11Post(inputImages, outputTensors, outputBoxes, num);
             break;
         case yoloType::YOLOV12:
-            ret = yolov12Post(inputImages, outputBoxes, num);
+            ret = yolov12Post(inputImages, outputTensors, outputBoxes, num);
             break;
         default:
             ret = stateType::UNMATCH_YOLO_TYPE_ERROR;
@@ -210,20 +211,14 @@ stateType sophgo_detect::resizeBox(const bm_image* inputImage, detectBoxes& outp
     return stateType::SUCCESS;
 }
 
-stateType sophgo_detect::yolov5Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num){
-
-    std::vector<std::shared_ptr<BMNNTensor>> outputTensors(m_output_num);
-    for(int i=0; i<m_output_num; i++){
-        outputTensors[i] = m_bmNetwork->outputTensor(i);
-    }
-
+stateType sophgo_detect::yolov5Post(const bm_image* inputImages, std::vector<BMNNTensor>& outputTensors, std::vector<detectBoxes>& outputBoxes, const int num){
     for(int batch_idx = 0; batch_idx < num; ++batch_idx)
     {
       detectBoxes yolobox_vec;
   
       int box_num = 0;
       for(int i=0; i<m_output_num; i++){
-        auto output_shape = m_bmNetwork->outputTensor(i)->get_shape();
+        auto output_shape = outputTensors[i].get_shape();
         auto output_dims = output_shape->num_dims;
         YOLO_CHECK(output_dims == 5, "The output's dim must be five. which means to [batch, anchor_num, feature_height,feature_width,feature]",enumName(m_yoloType));
         box_num += output_shape->dims[1] * output_shape->dims[2] * output_shape->dims[3];
@@ -243,7 +238,7 @@ stateType sophgo_detect::yolov5Post(const bm_image* inputImages, std::vector<det
       float *dst = decoded_data.data();
 
       for(int head_idx = 0; head_idx < m_output_num; head_idx++) {
-          auto output_tensor = m_bmNetwork->outputTensor(head_idx);
+          auto output_tensor = &outputTensors[head_idx];
           int feat_c = output_tensor->get_shape()->dims[1];
           int feat_h = output_tensor->get_shape()->dims[2];
           int feat_w = output_tensor->get_shape()->dims[3];
@@ -380,8 +375,8 @@ stateType sophgo_detect::yolov5Post(const bm_image* inputImages, std::vector<det
     return stateType::SUCCESS;
 }
 
-stateType sophgo_detect::yolov6Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num){
-    std::shared_ptr<BMNNTensor> output_tensor = m_bmNetwork->outputTensor(0);
+stateType sophgo_detect::yolov6Post(const bm_image* inputImages, std::vector<BMNNTensor>& outputTensors, std::vector<detectBoxes>& outputBoxes, const int num){
+    BMNNTensor* output_tensor = outputTensors.data();
     float* output_data = reinterpret_cast<float*>(output_tensor->get_cpu_data());
 
     for(int batch_idx = 0; batch_idx < num; ++batch_idx) {
@@ -484,12 +479,12 @@ stateType sophgo_detect::yolov6Post(const bm_image* inputImages, std::vector<det
     return stateType::SUCCESS;
 }
 
-stateType sophgo_detect::yolov7Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num){
-    return yolov5Post(inputImages, outputBoxes, num);
+stateType sophgo_detect::yolov7Post(const bm_image* inputImages, std::vector<BMNNTensor>& outputTensors, std::vector<detectBoxes>& outputBoxes, const int num){
+    return yolov5Post(inputImages, outputTensors, outputBoxes, num);
 }
 
-stateType sophgo_detect::yolov8Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num){
-    std::shared_ptr<BMNNTensor> output_tensor = m_bmNetwork->outputTensor(0);
+stateType sophgo_detect::yolov8Post(const bm_image* inputImages, std::vector<BMNNTensor>& outputTensors, std::vector<detectBoxes>& outputBoxes, const int num){
+    BMNNTensor* output_tensor = outputTensors.data();
     float* output_data = reinterpret_cast<float*>(output_tensor->get_cpu_data());
 
     for(int batch_idx = 0; batch_idx < num; ++batch_idx) {
@@ -588,13 +583,13 @@ stateType sophgo_detect::yolov8Post(const bm_image* inputImages, std::vector<det
     return stateType::SUCCESS;
 }
 
-stateType sophgo_detect::yolov9Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num){
-    return yolov8Post(inputImages, outputBoxes, num);
+stateType sophgo_detect::yolov9Post(const bm_image* inputImages, std::vector<BMNNTensor>& outputTensors, std::vector<detectBoxes>& outputBoxes, const int num){
+    return yolov8Post(inputImages, outputTensors, outputBoxes, num);
 }
 
 
-stateType sophgo_detect::yolov10Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num){
-    std::shared_ptr<BMNNTensor> output_tensor = m_bmNetwork->outputTensor(0);
+stateType sophgo_detect::yolov10Post(const bm_image* inputImages, std::vector<BMNNTensor>& outputTensors, std::vector<detectBoxes>& outputBoxes, const int num){
+    BMNNTensor* output_tensor = outputTensors.data();
     float* output_data = reinterpret_cast<float*>(output_tensor->get_cpu_data());
 
     for(int batch_idx = 0; batch_idx < num; ++batch_idx) {
@@ -636,10 +631,10 @@ stateType sophgo_detect::yolov10Post(const bm_image* inputImages, std::vector<de
     return stateType::SUCCESS;
 }
 
-stateType sophgo_detect::yolov11Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num){
-    return yolov8Post(inputImages, outputBoxes, num);
+stateType sophgo_detect::yolov11Post(const bm_image* inputImages, std::vector<BMNNTensor>& outputTensors, std::vector<detectBoxes>& outputBoxes, const int num){
+    return yolov8Post(inputImages, outputTensors, outputBoxes, num);
 }
 
-stateType sophgo_detect::yolov12Post(const bm_image* inputImages, std::vector<detectBoxes>& outputBoxes, const int num){
-    return yolov8Post(inputImages, outputBoxes, num);
+stateType sophgo_detect::yolov12Post(const bm_image* inputImages, std::vector<BMNNTensor>& outputTensors, std::vector<detectBoxes>& outputBoxes, const int num){
+    return yolov8Post(inputImages, outputTensors, outputBoxes, num);
 }

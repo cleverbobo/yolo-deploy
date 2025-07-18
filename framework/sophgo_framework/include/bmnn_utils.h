@@ -12,14 +12,13 @@
 #include <iostream>
 #include <string>
 #include <memory>
-#include <assert.h>
 #include <set>
 
 #include "yolo_common.h"
 
 #include "bmruntime_interface.h"
 #include "bmruntime_cpp.h"
-// #include "bm_wrapper.hpp"
+
 
 
 /*
@@ -36,40 +35,51 @@ class BMNNTensor{
    *    bm_store_mode_t st_mode;
    *  }
    */
-  bm_handle_t  m_handle;
-
-  std::string m_name;
-  float *m_cpu_data;
-  float m_scale;
-  bm_tensor_t *m_tensor;
-
-  bool can_mmap;
+  private:
+    bm_handle_t m_handle;
+    float *m_cpu_data;
+    bm_tensor_t *m_tensor;
+    bool can_mmap;
+    int m_dev_id;
+    std::shared_ptr<bm_tensor_t> m_tensor_ptr;
 
   public:
-  BMNNTensor(bm_handle_t handle, const char *name, float scale,
-      bm_tensor_t* tensor, bool can_mmap):m_handle(handle), m_name(name),
-  m_cpu_data(nullptr),m_scale(scale), m_tensor(tensor), can_mmap(can_mmap) {
+  BMNNTensor(bm_tensor_t* tensor=nullptr, int dev_id = 0):m_cpu_data(nullptr), m_tensor(tensor), m_dev_id(dev_id) {
+    int ret = bm_dev_request(&m_handle, dev_id);
+    YOLO_CHECK(BM_SUCCESS == ret);
+
+    struct bm_misc_info misc_info;
+    bm_status_t ret = bm_get_misc_info(m_handle, &misc_info);
+    YOLO_CHECK(BM_SUCCESS == ret);
+    can_mmap = misc_info.pcie_soc_mode == 1;
+    
+    if (m_tensor == nullptr) {
+      m_tensor_ptr = std::make_shared<bm_tensor_t>();
+      m_tensor = m_tensor_ptr.get();
+    }
   }
+
 
   virtual ~BMNNTensor() {
     if (m_cpu_data == NULL) return;
     if(can_mmap && BM_FLOAT32 == m_tensor->dtype) {
       int tensor_size = bm_mem_get_device_size(m_tensor->device_mem);
       bm_status_t ret = bm_mem_unmap_device_mem(m_handle, m_cpu_data, tensor_size);
-      assert(BM_SUCCESS == ret);
+      YOLO_CHECK(BM_SUCCESS == ret);
     } else {
       delete [] m_cpu_data;
     }
+    bm_dev_free(m_handle);
   }
 
   // Set tensor device memory.
-  int set_device_mem(bm_device_mem_t *mem){
-    this->m_tensor->device_mem = *mem;
-    return 0;
+  stateType set_device_mem(bm_device_mem_t *mem){
+    m_tensor->device_mem = *mem;
+    return stateType::SUCCESS;
   }
 
   const bm_device_mem_t* get_device_mem() {
-    return &this->m_tensor->device_mem;
+    return &(m_tensor->device_mem);
   }
 
   // Return an array pointer to system memory of tensor.
@@ -83,43 +93,43 @@ class BMNNTensor{
       if (m_tensor->dtype == BM_FLOAT32) {
         unsigned long long  addr;
         ret = bm_mem_mmap_device_mem(m_handle, &m_tensor->device_mem, &addr);
-        assert(BM_SUCCESS == ret);
+        YOLO_CHECK(BM_SUCCESS == ret);
         ret = bm_mem_invalidate_device_mem(m_handle, &m_tensor->device_mem);
-        assert(BM_SUCCESS == ret);
+        YOLO_CHECK(BM_SUCCESS == ret);
         pFP32 = (float*)addr;
       } else if (BM_INT8 == m_tensor->dtype) {
         int8_t * pI8 = nullptr;
         unsigned long long  addr;
         ret = bm_mem_mmap_device_mem(m_handle, &m_tensor->device_mem, &addr);
-        assert(BM_SUCCESS == ret);
+        YOLO_CHECK(BM_SUCCESS == ret);
         ret = bm_mem_invalidate_device_mem(m_handle, &m_tensor->device_mem);
-        assert(BM_SUCCESS == ret);
+        YOLO_CHECK(BM_SUCCESS == ret);
         pI8 = (int8_t*)addr;
 
         // dtype convert
         pFP32 = new float[count];
-        assert(pFP32 != nullptr);
+        YOLO_CHECK(pFP32 != nullptr);
         for(int i = 0;i < count; ++ i) {
-          pFP32[i] = pI8[i] * m_scale;
+          pFP32[i] = pI8[i];
         }
         ret = bm_mem_unmap_device_mem(m_handle, pI8, bm_mem_get_device_size(m_tensor->device_mem));
-        assert(BM_SUCCESS == ret);
+        YOLO_CHECK(BM_SUCCESS == ret);
       }else if (m_tensor->dtype == BM_INT32) {
         int32_t * pI32 = nullptr;
         unsigned long long  addr;
         ret = bm_mem_mmap_device_mem(m_handle, &m_tensor->device_mem, &addr);
-        assert(BM_SUCCESS == ret);
+        YOLO_CHECK(BM_SUCCESS == ret);
         ret = bm_mem_invalidate_device_mem(m_handle, &m_tensor->device_mem);
-        assert(BM_SUCCESS == ret);
+        YOLO_CHECK(BM_SUCCESS == ret);
         pI32 = (int32_t*)addr;
         // dtype convert
         pFP32 = new float[count];
-        assert(pFP32 != nullptr);
+        YOLO_CHECK(pFP32 != nullptr);
         for(int i = 0;i < count; ++ i) {
-          pFP32[i] = pI32[i] * m_scale;
+          pFP32[i] = pI32[i];
         }
         ret = bm_mem_unmap_device_mem(m_handle, pI32, bm_mem_get_device_size(m_tensor->device_mem));
-        assert(BM_SUCCESS == ret);
+        YOLO_CHECK(BM_SUCCESS == ret);
       } else{
         std::cout << "NOT support dtype=" << m_tensor->dtype << std::endl;
       }
@@ -127,37 +137,37 @@ class BMNNTensor{
       // the common method using d2s
       if (m_tensor->dtype == BM_FLOAT32) {
         pFP32 = new float[count];
-        assert(pFP32 != nullptr);
+        YOLO_CHECK(pFP32 != nullptr);
         ret = bm_memcpy_d2s_partial(m_handle, pFP32, m_tensor->device_mem, count * sizeof(float));
-        assert(BM_SUCCESS ==ret);
+        YOLO_CHECK(BM_SUCCESS ==ret);
       } else if (BM_INT8 == m_tensor->dtype) {
         int8_t * pI8 = nullptr;
         int tensor_size = bmrt_tensor_bytesize(m_tensor);
         pI8 = new int8_t[tensor_size];
-        assert(pI8 != nullptr);
+        YOLO_CHECK(pI8 != nullptr);
 
         // dtype convert
         pFP32 = new float[count];
-        assert(pFP32 != nullptr);
+        YOLO_CHECK(pFP32 != nullptr);
         ret = bm_memcpy_d2s_partial(m_handle, pI8, m_tensor->device_mem, tensor_size);
-        assert(BM_SUCCESS ==ret);
+        YOLO_CHECK(BM_SUCCESS ==ret);
         for(int i = 0;i < count; ++ i) {
-          pFP32[i] = pI8[i] * m_scale;
+          pFP32[i] = pI8[i];
         }
         delete [] pI8;
       }else if(m_tensor->dtype == BM_INT32){
         int32_t *pI32=nullptr;
         int tensor_size = bmrt_tensor_bytesize(m_tensor);
         pI32 =new int32_t[tensor_size];
-        assert(pI32 != nullptr);
+        YOLO_CHECK(pI32 != nullptr);
 
         // dtype convert
         pFP32 = new float[count];
-        assert(pFP32 != nullptr);
+        YOLO_CHECK(pFP32 != nullptr);
         ret = bm_memcpy_d2s_partial(m_handle, pI32, m_tensor->device_mem, tensor_size);
-        assert(BM_SUCCESS ==ret);
+        YOLO_CHECK(BM_SUCCESS ==ret);
         for(int i = 0;i < count; ++ i) {
-          pFP32[i] = pI32[i] * m_scale;
+          pFP32[i] = pI32[i];
         }
         delete [] pI32;
         
@@ -187,22 +197,23 @@ class BMNNTensor{
     return m_tensor->dtype;
   }
 
-  float get_scale() {
-    return m_scale;
+
+  bm_tensor_t* get_tensor() {
+    return m_tensor;
   }
 
-  void set_shape(const int* shape, int dims) {
-    m_tensor->shape.num_dims = dims;
-    for(int i=0; i<dims; i++){
-      m_tensor->shape.dims[i] = shape[i];
+  stateType release_tensor_mem() {
+    int tensor_size = bm_mem_get_device_size(m_tensor->device_mem);
+    if(tensor_size > 0) {
+      if(m_cpu_data && can_mmap && BM_FLOAT32 == m_tensor->dtype) {
+        bm_status_t ret = bm_mem_unmap_device_mem(m_handle, m_cpu_data, tensor_size);
+        YOLO_CHECK(BM_SUCCESS == ret);
+      }
+      bm_free_device(m_handle, m_tensor->device_mem);
+    } else {
+      YOLO_WARN("The device memory of tensor is already released.");
+      return stateType::SUCCESS;
     }
-  }
-  void set_shape_by_dim(int dim, int size){
-    assert(m_tensor->shape.num_dims>dim);
-    m_tensor->shape.dims[dim] = size;
-  }
-  int get_num() {
-    return m_tensor->shape.dims[0];
   }
 
 };
@@ -214,16 +225,13 @@ class BMNNTensor{
  *      3. Print Network information.
  */
 class BMNNNetwork : public NoCopyable {
-  bm_tensor_t* m_inputTensors;
-  bm_tensor_t* m_outputTensors;
+
   bm_handle_t  m_handle;
   void *m_bmrt;
   bool is_soc;
   std::set<int> m_batches;
   int m_max_batch;
 
-  std::unordered_map<std::string, bm_tensor_t*> m_mapInputs;
-  std::unordered_map<std::string, bm_tensor_t*> m_mapOutputs;
 
   public:
   // Initialize a network for inference, including handle\netinfo\io tensors.
@@ -240,54 +248,18 @@ class BMNNNetwork : public NoCopyable {
       }
     }
     m_batches.insert(batches.begin(), batches.end());
-    m_inputTensors = new bm_tensor_t[m_netinfo->input_num];
-    m_outputTensors = new bm_tensor_t[m_netinfo->output_num];
-    for(int i = 0; i < m_netinfo->input_num; ++i) {
-      m_inputTensors[i].dtype = m_netinfo->input_dtypes[i];
-      m_inputTensors[i].shape = m_netinfo->stages[0].input_shapes[i];
-      m_inputTensors[i].st_mode = BM_STORE_1N;
-      // input device mem should be provided outside, such as from image's contiguous mem
-      m_inputTensors[i].device_mem = bm_mem_null();
-    }
-
-    for(int i = 0; i < m_netinfo->output_num; ++i) {
-      m_outputTensors[i].dtype = m_netinfo->output_dtypes[i];
-      m_outputTensors[i].shape = m_netinfo->stages[0].output_shapes[i];
-      m_outputTensors[i].st_mode = BM_STORE_1N;
-      
-      // alloc as max size to reuse device mem, avoid to alloc and free everytime
-      size_t max_size=0;
-			for(int s=0; s<m_netinfo->stage_num; s++){
-         size_t out_size = bmrt_shape_count(&m_netinfo->stages[s].output_shapes[i]);
-         if(max_size<out_size){
-            max_size = out_size;
-         }
-      }
-      max_size *= bmruntime::ByteSize(m_netinfo->output_dtypes[i]);
-      auto ret =  bm_malloc_device_byte(m_handle, &m_outputTensors[i].device_mem, max_size);
-			assert(BM_SUCCESS == ret);
-    }
     struct bm_misc_info misc_info;
     bm_status_t ret = bm_get_misc_info(m_handle, &misc_info);
-    assert(BM_SUCCESS == ret);
+    YOLO_CHECK(BM_SUCCESS == ret);
     is_soc = misc_info.pcie_soc_mode == 1;
 
     printf("*** Run in %s mode ***\n", is_soc?"SOC": "PCIE");
 
-    //assert(m_netinfo->stage_num == 1);
+    //YOLO_CHECK(m_netinfo->stage_num == 1);
     showInfo();
   }
 
   ~BMNNNetwork() {
-    //Free input tensors
-    delete [] m_inputTensors;
-    //Free output tensors
-    for(int i = 0; i < m_netinfo->output_num; ++i) {
-      if (m_outputTensors[i].device_mem.size != 0) {
-        bm_free_device(m_handle, m_outputTensors[i].device_mem);
-      }
-    }
-    delete []m_outputTensors;
   }
 
   int maxBatch() const {
@@ -299,7 +271,7 @@ class BMNNNetwork : public NoCopyable {
              return batch;
 					}
       }
-      assert(0);
+      YOLO_CHECK(0);
       return m_max_batch;
   }
 
@@ -307,57 +279,55 @@ class BMNNNetwork : public NoCopyable {
     return m_netinfo->input_num;
   }
 
-  std::shared_ptr<BMNNTensor> inputTensor(int index, int stage_idx=-1){
-    assert(index < m_netinfo->input_num);
-    if(stage_idx >= 0){
-      for(int i = 0; i < m_netinfo->input_num; ++i) {
-        m_inputTensors[i].shape = m_netinfo->stages[stage_idx].input_shapes[i];
-      }
-    }
-    return std::make_shared<BMNNTensor>(m_handle, m_netinfo->input_names[index],
-        m_netinfo->input_scales[index], &m_inputTensors[index], is_soc);
-  }
+
 
   int outputTensorNum() {
     return m_netinfo->output_num;
   }
 
-  std::shared_ptr<BMNNTensor> outputTensor(int index, int stage_idx=-1){
-    assert(index < m_netinfo->output_num);
-    if(stage_idx >= 0){
-      for(int i = 0; i < m_netinfo->output_num; ++i) {
-        m_outputTensors[i].shape = m_netinfo->stages[stage_idx].output_shapes[i];
+
+
+  std::vector<BMNNTensor> forward(BMNNTensor* inputTensors, const int num) {
+    //attach input tensors 
+    std::vector<bm_tensor_t> inputTensorsVec(num);
+    for (int i = 0; i < num; ++i) {
+      inputTensorsVec[i] = *inputTensors[i].get_tensor();
+    }
+
+    // malloc output tensors
+    std::vector<BMNNTensor> outputTensors(m_netinfo->output_num);
+    for(int i = 0; i < m_netinfo->output_num; ++i) {
+      auto outputTensor = outputTensors[i].get_tensor();
+      outputTensor->dtype = m_netinfo->output_dtypes[i];
+      outputTensor->shape = m_netinfo->stages[0].output_shapes[i];
+      outputTensor->st_mode = BM_STORE_1N;
+      
+      // alloc as max size to reuse device mem, avoid to alloc and free everytime
+      size_t max_size = 0;
+			for(int s=0; s<m_netinfo->stage_num; s++){
+         size_t out_size = bmrt_shape_count(&m_netinfo->stages[s].output_shapes[i]);
+         if(max_size < out_size){
+            max_size = out_size;
+         }
       }
+      max_size *= bmruntime::ByteSize(m_netinfo->output_dtypes[i]);
+      auto ret =  bm_malloc_device_byte(m_handle, &(outputTensor->device_mem), max_size);
+			YOLO_CHECK(BM_SUCCESS == ret);
     }
-    return std::make_shared<BMNNTensor>(m_handle, m_netinfo->output_names[index],
-        m_netinfo->output_scales[index], &m_outputTensors[index], is_soc);
-  }
+    std::vector<bm_tensor_t> outputTensorsVec(m_netinfo->output_num);
+    for(int i=0; i<m_netinfo->output_num; i++){
+      outputTensorsVec[i] = *outputTensors[i].get_tensor();
+    }
+    
 
-  int forward() {
-    bool user_mem = false; // if false, bmrt will alloc mem every time.
-    if (m_outputTensors->device_mem.size != 0) {
-      // if true, bmrt don't alloc mem again.
-      user_mem = true;
-    }
+    bool ok=bmrt_launch_tensor_ex(m_bmrt, m_netinfo->name, inputTensorsVec.data(), m_netinfo->input_num,
+                                  outputTensorsVec.data(), m_netinfo->output_num, true, false);
+    YOLO_CHECK(ok == BM_SUCCESS);
 
-    bool ok=bmrt_launch_tensor_ex(m_bmrt, m_netinfo->name, m_inputTensors, m_netinfo->input_num,
-        m_outputTensors, m_netinfo->output_num, user_mem, false);
-    if (!ok) {
-      std::cout << "bm_launch_tensor() failed=" << std::endl;
-      return -1;
-    }
     bool status = bm_thread_sync(m_handle);
-    assert(BM_SUCCESS == status);
+    YOLO_CHECK(BM_SUCCESS == status);
 
-#if 0
-    for(int i = 0;i < m_netinfo->output_num; ++i) {
-      auto tensor = m_outputTensors[i];
-      // dump
-      std::cout << "output_tensor [" << i << "] size=" << bmrt_tensor_device_size(&tensor) << std::endl;
-    }
-#endif
-
-    return 0;
+    return outputTensors;
   }
 
   static std::string shape_to_str(const bm_shape_t& shape) {
@@ -367,6 +337,47 @@ class BMNNNetwork : public NoCopyable {
     }
     str += "]";
     return str;
+  }
+
+  
+  std::vector<bm_data_type_t> input_dtypes() const {
+    std::vector<bm_data_type_t> dtypes;
+    for(int i=0; i<m_netinfo->input_num; i++){
+      dtypes.push_back(m_netinfo->input_dtypes[i]);
+    }
+    return dtypes;
+  }
+
+  std::vector<bm_data_type_t> output_dtypes() const {
+    std::vector<bm_data_type_t> dtypes;
+    for(int i=0; i<m_netinfo->output_num; i++){
+      dtypes.push_back(m_netinfo->output_dtypes[i]);
+    }
+    return dtypes;
+  }
+
+  std::vector<std::vector<int>> input_shapes() const {
+    std::vector<std::vector<int>> shapes;
+    for(int i=0; i<m_netinfo->input_num; i++){
+      std::vector<int> shape;
+      for(int j=0; j<m_netinfo->stages[0].input_shapes[i].num_dims; j++){
+        shape.push_back(m_netinfo->stages[0].input_shapes[i].dims[j]);
+      }
+      shapes.push_back(shape);
+    }
+    return shapes;
+  }
+  
+  std::vector<std::vector<int>> output_shapes() const {
+    std::vector<std::vector<int>> shapes;
+    for(int i=0; i<m_netinfo->output_num; i++){
+      std::vector<int> shape;
+      for(int j=0; j<m_netinfo->stages[0].output_shapes[i].num_dims; j++){
+        shape.push_back(m_netinfo->stages[0].output_shapes[i].dims[j]);
+      }
+      shapes.push_back(shape);
+    }
+    return shapes;
   }
 
   void showInfo()
@@ -417,7 +428,7 @@ class BMNNHandle: public NoCopyable {
   public:
   BMNNHandle(int dev_id=0):m_dev_id(dev_id) {
     int ret = bm_dev_request(&m_handle, dev_id);
-    assert(BM_SUCCESS == ret);
+    YOLO_CHECK(BM_SUCCESS == ret);
   }
 
   ~BMNNHandle(){
@@ -502,7 +513,7 @@ class BMNNContext : public NoCopyable {
   }
 
   std::shared_ptr<BMNNNetwork> network(int net_index) {
-    assert(net_index < (int)m_network_names.size());
+    YOLO_CHECK(net_index < (int)m_network_names.size());
     return std::make_shared<BMNNNetwork>(m_bmrt, m_network_names[net_index]);
   }
 

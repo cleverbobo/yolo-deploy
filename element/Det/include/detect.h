@@ -12,6 +12,8 @@ public:
     virtual ~detect();
 
     virtual std::vector<detectBoxes> process(void* inputImage, const int num) = 0;
+    virtual stateType processAsync(void* inputImage, const int num) = 0;
+    virtual stateType getDetResult(detectBoxes& outputBoxes, const int idx = 0) = 0;
 
     virtual algorithmInfo getAlgorithmInfo();
     virtual void printAlgorithmInfo();
@@ -20,6 +22,7 @@ public:
     virtual void resetPreprocessConfig(const std::vector<float>& mean = {0.0f, 0.0f, 0.0f}, const std::vector<float>& std = {1.0f/255, 1.0f/255, 1.0f/255}, 
                                        const bool bgr2rgb = true, const int padValue = 114, const resizeType& resizeType = resizeType::RESIZE_CENTER_PAD);
     virtual void resetClassNames(const std::vector<std::string>& class_names);
+    virtual void processAsync();
 
 protected:
     std::string m_model_path;
@@ -47,6 +50,9 @@ protected:
 
     // fps counter
     fpsCounter m_fpsCounter;
+
+    // thread_num
+    int m_thread_num = 6;
 
 };
 

@@ -15,8 +15,8 @@ detect::detect(const std::string& modelPath, const yoloType& type, const int dev
 }
 
 detect::~detect() {
-    auto avgFps = m_fpsCounter.getAvgFps();
-    std::cout << enumName(m_yoloType) << " detection is finished. Average FPS: " << avgFps << std::endl;
+    std::cout << enumName(m_yoloType) << " detection is finished."  << std::endl;
+    m_fpsCounter.summary();
 }
 
 algorithmInfo detect::getAlgorithmInfo() {
