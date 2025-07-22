@@ -37,7 +37,7 @@ void detect::printAlgorithmInfo() {
         for (const auto& dim : shape) {
             std::cout << dim << " ";
         }
-        std::cout << "] ";
+        std::cout << "\b" << "] ";
     }
     std::cout << std::endl;
 
@@ -47,7 +47,7 @@ void detect::printAlgorithmInfo() {
         for (const auto& dim : shape) {
             std::cout << dim << " ";
         }
-        std::cout << "] ";
+        std::cout << "\b" << "] ";
     }
     std::cout << std::endl;
     std::cout << "Batch Size: " << m_algorithmInfo.batch_size << std::endl <<std::endl;;
