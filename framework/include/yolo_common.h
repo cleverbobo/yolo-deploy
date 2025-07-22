@@ -12,6 +12,10 @@
 
 #define enumName(expr) magic_enum::enum_name(expr) 
 
+namespace cv {
+    class Mat;
+}
+
 
 inline std::string concatArgs() { return ""; }
 
@@ -47,9 +51,9 @@ enum class yoloType {
 
 enum class algorithmType {
     DETECT,
-    SEGMENTATION,
-    CLASSIFICATION,
-    POSE_ESTIMATION,
+    SEGMENT,
+    CLASSIFIY,
+    POSE,
     UNKNOWN
 };
 
@@ -144,6 +148,31 @@ struct detectBox {
     std::string className="";
 };
 using detectBoxes = std::vector<detectBox>;
+
+struct segmentBox {
+    // 左上角坐标
+    int left,top;
+
+    // 右下角坐标
+    int right,bottom;
+
+    // 宽，高
+    int width, height;
+
+    // 置信度
+    float score;
+
+    // 类别id
+    int classId;
+
+    // 类别名称
+    std::string className="";
+
+    // 分割掩码
+    std::vector<float> mask;
+    std::shared_ptr<cv::Mat> maskImg;
+};
+using segmentBoxes = std::vector<segmentBox>;
 
 
 // 输出的数据格式
