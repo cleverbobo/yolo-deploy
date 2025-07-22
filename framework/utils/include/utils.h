@@ -30,7 +30,7 @@ void NMS(T& inputBox, T& outputBox, float nmsThreshold) {
     size_t size = inputBox.size();
     // 对检测框按照置信度从高到低排序
     T sorted_dets = inputBox;
-    std::sort(sorted_dets.begin(), sorted_dets.end(), [](const detectBox &l, const detectBox &r) {
+    std::sort(sorted_dets.begin(), sorted_dets.end(), [](const typename T::value_type &l, const typename T::value_type &r) {
         return l.score > r.score;
     });
   
@@ -99,14 +99,48 @@ void restrictBox(T& box, const int img_w, const int img_h){
 
 // draw functions only for debug
 void drawBox(detectBoxes& boxes, cv::Mat& img, std::string outputName, std::string outputDirPath = "./detect_result");
-void drawSegmentation(segmentBoxes& boxes, cv::Mat& img, std::string outputName, std::string outputDirPath = "./segment_result");
+void drawSegmentation(const segmentBoxes& boxes, cv::Mat& img, std::string outputName, std::string outputDirPath = "./segment_result");
 // void drawLandmark();
 
 // json functions
-nlohmann::ordered_json box2json(const std::string imgPath, const detectBoxes& boxes);
-void boxVec2json(const std::string imgPath, const detectBoxes& boxes, nlohmann::ordered_json& jsonObj);
-// void segmentation2json();
-// void landmark2json();
+
+template <typename T = detectBoxes>
+nlohmann::ordered_json box2json(const std::string imgPath, const T& boxes){
+    nlohmann::ordered_json jsonObj;
+    jsonObj["image_path"] = imgPath;
+    jsonObj["boxes"] = nlohmann::ordered_json::array();
+    for (const auto& box : boxes) {
+        nlohmann::ordered_json boxJson;
+        boxJson["left"] = box.left;
+        boxJson["top"] = box.top;
+        boxJson["right"] = box.right;
+        boxJson["bottom"] = box.bottom;
+        boxJson["width"] = box.width;
+        boxJson["height"] = box.height;
+        boxJson["score"] = box.score;
+        boxJson["classId"] = box.classId;
+        jsonObj["boxes"].push_back(boxJson);
+        if constexpr (std::is_same<T, segmentBoxes>::value) {
+            std::vector<int> maskImg_data(box.maskImg->rows * box.maskImg->cols);
+            std::memcpy(maskImg_data.data(), box.maskImg->data, maskImg_data.size() * sizeof(int));
+            boxJson["maskImg"] = maskImg_data;
+            boxJson["mask"] = box.mask;
+        }
+    }
+    return jsonObj;
+};
+
+template <typename T = detectBoxes>
+void boxVec2json(const std::string imgPath, const T& boxes, nlohmann::ordered_json& jsonObj){
+    auto num = imgPath.size();
+    
+    for (int i = 0; i < num; ++i) {
+        jsonObj.push_back(box2json(imgPath[i], boxes[i]));
+    }
+};
+
+
+
 void jsonDump(std::string jsonPath, nlohmann::ordered_json& jsonObj);
 void jsonDump(std::string jsonPath, std::vector<nlohmann::ordered_json>& jsonObjVec);
 

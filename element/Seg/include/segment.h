@@ -28,20 +28,20 @@ protected:
     int m_devId;
     yoloType m_yoloType;
 
-// network config
+    // network config
     std::vector<std::string> m_class_names;
     int m_class_num = 0;
     int m_net_h, m_net_w;
     int m_max_batch;
 
-// preprocess config
+    // preprocess config
     std::vector<float> m_mean;
     std::vector<float> m_std;
     bool m_bgr2rgb;
     int m_padValue;
     resizeType m_resizeType;
 
-// postprocess config
+    // postprocess config
     float m_confThreshold = 0.5f;
     float m_nmsThreshold = 0.5f;
     int m_output_num;
@@ -49,9 +49,8 @@ protected:
     int m_output_seg_dim;
     int m_seg_feature_size;
     int m_nout;
-    int m_class_num;
 
-// fps counter
+    // fps counter
     fpsCounter m_fpsCounter;
 
     

@@ -4,6 +4,7 @@
 class BMNNContext;
 class BMNNNetwork;
 class BMNNHandle;
+class BMNNTensor;
 class bm_image;
 typedef struct bmcv_padding_atrr_s bmcv_padding_atrr_t;
 

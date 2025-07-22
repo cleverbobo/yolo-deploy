@@ -8,7 +8,7 @@ if (NOT DEFINED TARGET_ARCH)
     set(TARGET_ARCH sophgo)
 endif()
 
-message(STATUS "[INFO] BUILD segment FOR TARGET_ARCH: ${TARGET_ARCH}")
+message(STATUS "[INFO] BUILD SEGMENT FOR TARGET_ARCH: ${TARGET_ARCH}")
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -pthread -fpermissive")

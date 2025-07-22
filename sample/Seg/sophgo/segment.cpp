@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
             cv::Mat imgMat;
             cv::bmcv::toMAT(&img, imgMat);
             std::string outputName = inputFile.substr(inputFile.find_last_of("/") + 1);
-            drawBox(resBox[0], imgMat, outputName, outputDir);
+            drawSegmentation(resBox[0], imgMat, outputName, outputDir);
             bm_image_destroy(img);
             break;
         }
@@ -98,7 +98,7 @@ int main(int argc, char** argv) {
                     cv::Mat imgMat;
                     cv::bmcv::toMAT(&images[j], imgMat);
                     std::string outputName = jpgFiles[i*batch_size+j].substr(jpgFiles[i*batch_size+j].find_last_of("/") + 1);
-                    drawBox(resBox[j], imgMat, outputName, outputDir);
+                    drawSegmentation(resBox[j], imgMat, outputName, outputDir);
                 }
                 for (auto& image : images) {
                     auto ret = bm_image_destroy(image);
@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
                     cv::bmcv::toMAT(&imgVec[i], imgMat);
                     // debug
                     std::string outputName = getFileName(inputFile) + "_" + std::to_string(frame_id) + ".jpg";
-                    drawBox(resBox[i], imgMat, outputName, outputDir);
+                    drawSegmentation(resBox[i], imgMat, outputName, outputDir);
                     frame_id++;
                 }
                 count = 0;

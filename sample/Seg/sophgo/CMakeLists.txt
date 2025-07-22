@@ -7,7 +7,7 @@ if (NOT DEFINED TARGET_ARCH)
     set(TARGET_ARCH sophgo)
 endif()
 
-message(STATUS "[INFO] BUILD DET SAMPLE FOR TARGET_ARCH: ${TARGET_ARCH}")
+message(STATUS "[INFO] BUILD SEG SAMPLE FOR TARGET_ARCH: ${TARGET_ARCH}")
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}  -fprofile-arcs")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -rdynamic")
@@ -42,7 +42,7 @@ if (${TARGET_ARCH} STREQUAL "sophgo")
 
     include_directories(../../../framework/sophgo_framework/include)
 
-    add_executable(detect_sophgo.run detect.cpp)
-    target_link_libraries(detect_sophgo.run ${OpenCV_LIBS} -ldetect -lsophgo_framework -lutils)
+    add_executable(segment_sophgo.run segment.cpp)
+    target_link_libraries(segment_sophgo.run ${OpenCV_LIBS} -lsegment -lsophgo_framework -lutils)
 
 endif()

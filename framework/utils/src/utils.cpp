@@ -177,32 +177,6 @@ void drawSegmentation(const segmentBoxes& boxes, cv::Mat& img, std::string outpu
 }
 
 // json functions
-nlohmann::ordered_json box2json(const std::string imgPath, const detectBoxes& boxes){
-    nlohmann::ordered_json jsonObj;
-    jsonObj["image_path"] = imgPath;
-    jsonObj["boxes"] = nlohmann::ordered_json::array();
-    for (const auto& box : boxes) {
-        nlohmann::ordered_json boxJson;
-        boxJson["left"] = box.left;
-        boxJson["top"] = box.top;
-        boxJson["right"] = box.right;
-        boxJson["bottom"] = box.bottom;
-        boxJson["width"] = box.width;
-        boxJson["height"] = box.height;
-        boxJson["score"] = box.score;
-        boxJson["classId"] = box.classId;
-        jsonObj["boxes"].push_back(boxJson);
-    }
-    return jsonObj;
-}
-
-void boxVec2json(const std::vector<std::string>& imgPath, const std::vector<detectBoxes>& boxes, std::vector<nlohmann::ordered_json>& jsonObj) {
-    auto num = imgPath.size();
-    
-    for (int i = 0; i < num; ++i) {
-        jsonObj.push_back(box2json(imgPath[i], boxes[i]));
-    }
-}
 
 void jsonDump(std::string jsonPath, nlohmann::ordered_json& jsonObj){
     std::ofstream ofs(jsonPath);

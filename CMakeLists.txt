@@ -50,13 +50,21 @@ endfunction()
 
 checkAndAddElement(element/Det)
 add_dependencies(detect utils)
+
+checkAndAddElement(element/Seg)
+add_dependencies(segment utils)
+
+
 # checkAndAddElement(element/Pose)
-# checkAndAddElement(element/Seg)
+
 
 
 if (${TARGET_ARCH} STREQUAL "sophgo")
     checkAndAddSample(sample/Det/sophgo)
     add_dependencies(detect_sophgo.run detect)
+
+    checkAndAddElement(sample/Seg/sophgo)
+    add_dependencies(segment_sophgo.run segment)
 
 elseif(${TARGET_ARCH} STREQUAL "tensorrt")
     checkAndAddSample(sample/Det/tensorrt)
