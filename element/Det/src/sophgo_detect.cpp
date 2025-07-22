@@ -500,7 +500,7 @@ stateType sophgo_detect::yolov8Post(const bm_image* inputImages, std::vector<det
         int box_num = output_tensor->get_shape()->dims[1];
 
         #if USE_MULTICLASS_NMS
-            int out_nout = m_nout;
+            int out_nout = m_nout - 1;
         #else
             int out_nout = 7;
         #endif
