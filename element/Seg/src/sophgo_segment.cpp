@@ -34,7 +34,12 @@ sophgo_segment::sophgo_segment(const std::string& modelPath, const yoloType& typ
     m_output_det_dim = det_output_tensor->get_shape()->num_dims;
     m_nout = det_output_tensor->get_shape()->dims[m_output_det_dim-1];
 
-    auto seg_output_tensor = m_bmNetwork->outputTensor(m_output_num - 1);
+    std::shared_ptr<BMNNTensor> seg_output_tensor;
+    if (m_yoloType != yoloType::YOLOV6) {
+        seg_output_tensor = m_bmNetwork->outputTensor(m_output_num - 1);
+    } else {
+        seg_output_tensor = m_bmNetwork->outputTensor(m_output_num - 2);
+    }
     m_seg_feature_size = seg_output_tensor->get_shape()->dims[1];
     m_class_num = m_nout - 5 - m_seg_feature_size; 
 
@@ -453,6 +458,123 @@ stateType sophgo_segment::yolov5Post(const bm_image* inputImages, std::vector<se
 }
 
 stateType sophgo_segment::yolov6Post(const bm_image* inputImages, std::vector<segmentBoxes>& outputBoxes, const int num) {
+    std::shared_ptr<BMNNTensor> output_tensor = m_bmNetwork->outputTensor(0);
+    float* output_data = reinterpret_cast<float*>(output_tensor->get_cpu_data());
+
+    auto seg_proto_tensor = m_bmNetwork->outputTensor(1);
+
+    auto seg_mask_tensor = m_bmNetwork->outputTensor(2);
+    float* seg_mask_data = reinterpret_cast<float*>(seg_mask_tensor->get_cpu_data());
+
+    for(int batch_idx = 0; batch_idx < num; ++batch_idx) {
+        segmentBoxes yolobox_vec;
+
+        auto output_shape = output_tensor->get_shape();
+        YOLO_CHECK(output_shape->num_dims == 3, "The {} output's dim must be three. which means to [batch, box_num, feature]",enumName(m_yoloType));
+        int box_num = output_tensor->get_shape()->dims[1];
+        // m_class_num = output_tensor->get_shape()->dims[2] - 5;
+
+        #if USE_MULTICLASS_NMS
+            int out_nout = m_nout;
+        #else
+            int out_nout = 7;
+        #endif
+        
+        float *batch_output_data = output_data + batch_idx * box_num * m_nout;
+        float *batch_mask_data = seg_mask_data + batch_idx * box_num * (m_seg_feature_size + 1);
+        int max_wh = 7680;
+        bool agnostic = false;
+        for(int i = 0; i < box_num; ++i) {
+            float score = batch_output_data[4];
+            if (score < m_confThreshold) {
+                batch_output_data += m_nout;
+                batch_mask_data += m_seg_feature_size + 1;  
+                continue;
+            }
+            #if USE_MULTICLASS_NMS
+                for (int j = 0; j < m_class_num; ++j) {
+                    float confidence = batch_output_data[j + 5];
+                    int class_id = j;
+                    if (confidence * score > m_confThreshold) {
+                        center_x = batch_output_data[0];
+                        center_y = batch_output_data[1];
+                        width = batch_output_data[2];
+                        height = batch_output_data[3];
+                    }
+                    segmentBox box;
+
+                    box.left = center_x - width / 2;
+                    box.top = center_y - height / 2;
+                    box.right = box.left + width;
+                    box.bottom = box.top + height;  
+                    box.classId = class_id;
+                    box.score = confidence * score;
+
+                    if (!agnostic) {
+                        box.left += class_id * max_wh;
+                        box.top += class_id * max_wh;
+                        box.right += class_id * max_wh;
+                        box.bottom += class_id * max_wh;
+                    }
+
+                    // segment mask
+                    box.mask.resize(m_seg_feature_size);
+                    std::memcpy(box.mask.data(), batch_mask_data + 1, m_seg_feature_size * sizeof(float));
+                    batch_mask_data += m_seg_feature_size + 1;  
+                    yolobox_vec.push_back(box);
+                    
+                }
+            #else
+                int class_id = argmax(batch_output_data + 5, m_class_num);
+                float confidence = batch_output_data[5 + class_id];
+                if (confidence * score > m_confThreshold) {
+                    float center_x = batch_output_data[0];
+                    float center_y = batch_output_data[1];
+                    float width = batch_output_data[2];
+                    float height = batch_output_data[3];
+
+                    segmentBox box;
+                    box.left = center_x - width / 2;
+                    box.top = center_y - height / 2;
+                    box.right = box.left + width;
+                    box.bottom = box.top + height;
+                    
+                    if (!agnostic) {
+                        box.left += class_id * max_wh;
+                        box.top += class_id * max_wh;
+                        box.right += class_id * max_wh;
+                        box.bottom += class_id * max_wh;
+                    }
+                    box.classId = class_id;
+                    box.score = confidence * score;
+
+                    // segment mask
+                    box.mask.resize(m_seg_feature_size);
+                    std::memcpy(box.mask.data(), batch_mask_data + 1, m_seg_feature_size * sizeof(float));
+                    
+
+                    yolobox_vec.push_back(box);
+                }
+                batch_output_data += m_nout;
+                batch_mask_data += m_seg_feature_size + 1;  
+        
+            #endif
+        }
+        segmentBoxes resVec;
+        NMS(yolobox_vec, resVec, m_nmsThreshold);
+        for (auto& box : resVec){
+            if (!agnostic){
+                box.left -= box.classId * max_wh;
+                box.top -= box.classId * max_wh;
+                box.right -= box.classId * max_wh;
+                box.bottom -= box.classId * max_wh;
+            }
+        }
+
+        getSegmentBox(inputImages+batch_idx, resVec, seg_proto_tensor);
+        YOLO_DEBUG("batch_id: {}, outputbox number is {}", batch_idx, resVec.size());
+        outputBoxes.push_back(resVec);
+    }
     return stateType::SUCCESS;
 }
 
@@ -481,7 +603,7 @@ stateType sophgo_segment::yolov8Post(const bm_image* inputImages, std::vector<se
         
         float *batch_output_data = det_output_data + batch_idx * box_num * m_nout;
         int max_wh = 7680;
-        bool agnostic = true;
+        bool agnostic = false;
         for(int i = 0; i < box_num; ++i) {
             #if USE_MULTICLASS_NMS
                 for (int j = 0; j < m_class_num; ++j) {
