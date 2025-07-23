@@ -200,13 +200,12 @@ stateType sophgo_segment::getSegmentBox(const bm_image* inputImages, segmentBoxe
         maskVec[i] = cv::Mat(1,m_seg_feature_size, CV_32FC1, outputBoxes[i].mask.data());
     }
     
-
-    int proto_size = protoTensor->get_shape()->dims[1];
+    auto proto_shape = protoTensor->get_shape();
     int proto_height = protoTensor->get_shape()->dims[2];
     int proto_width = protoTensor->get_shape()->dims[3];
 
     float* proto_data = reinterpret_cast<float*>(protoTensor->get_cpu_data());
-    cv::Mat proto(proto_height, proto_width, CV_32FC1, proto_data);
+    cv::Mat proto(proto_shape->num_dims, proto_shape->dims,  CV_32F, proto_data);
 
     int img_w = inputImages->width;
     int img_h = inputImages->height;
@@ -240,14 +239,14 @@ stateType sophgo_segment::getSegmentBox(const bm_image* inputImages, segmentBoxe
     float mask_scale_x = scale_x * proto_width / m_net_w;
     float mask_scale_y = scale_y * proto_height / m_net_h;
 
-    int mask_dx = static_cast<int>(dx * mask_scale_x);
-    int mask_dy = static_cast<int>(dy * mask_scale_y);
+    int mask_dx = static_cast<int>(dx * proto_width / m_net_w);
+    int mask_dy = static_cast<int>(dy * proto_height / m_net_h);
 
 
     for (auto i = 0; i < outputBoxes.size(); ++i) {
         auto& outputBox = outputBoxes[i];
-        auto mask_w = static_cast<int>(outputBox.width * mask_scale_x);
-        auto mask_h = static_cast<int>(outputBox.height * mask_scale_y);
+        auto mask_w = static_cast<int>(img_w * mask_scale_x);
+        auto mask_h = static_cast<int>(img_h * mask_scale_y);
         std::vector<cv::Range> mask_range = {
             cv::Range(0, 1),
             cv::Range::all(),
@@ -255,7 +254,7 @@ stateType sophgo_segment::getSegmentBox(const bm_image* inputImages, segmentBoxe
             cv::Range(mask_dx, mask_dx + mask_w)
         };
 
-        cv::Mat mask_proto = (proto(mask_range).clone()) .reshape(0, {m_seg_feature_size, mask_h * mask_w});
+        cv::Mat mask_proto = (proto(mask_range).clone()).reshape(0, {m_seg_feature_size, mask_h * mask_w});
         cv::Mat res = maskVec[i] * mask_proto;
         res = res.reshape(1, {mask_h, mask_w});
 
@@ -282,7 +281,7 @@ stateType sophgo_segment::yolov5Post(const bm_image* inputImages, std::vector<se
       segmentBoxes yolobox_vec;
   
       int box_num = 0;
-      for(int i=0; i<m_output_num; i++){
+      for(int i=0; i<m_output_num - 1; i++){
         auto output_shape = m_bmNetwork->outputTensor(i)->get_shape();
         auto output_dims = output_shape->num_dims;
         YOLO_CHECK(output_dims == 5, "The {} output's dim must be five. which means to [batch, anchor_num, feature_height,feature_width,feature]",enumName(m_yoloType));

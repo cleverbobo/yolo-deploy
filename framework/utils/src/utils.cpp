@@ -79,13 +79,34 @@ cv::Mat letterbox(const cv::Mat& src, const cv::Size& dst_shape,
 }
 
 // draw functions only for debug
+// class id不超过100
+// 每种颜色要相对深一点
+cv::Scalar getColor(int classId) {
+    // 限制classId在0~99
+    classId += 1; 
+
+    // HSV空间分布色相，每种类别不同色相
+    int h = (classId * 179 / 100); // OpenCV HSV色相范围[0,179]
+    int s = 200;                   // 饱和度高一点，颜色鲜明
+    int v = 120;                   // 明度低一点，颜色深一点
+
+    cv::Mat hsv(1, 1, CV_8UC3, cv::Scalar(h, s, v));
+    cv::Mat bgr;
+    cv::cvtColor(hsv, bgr, cv::COLOR_HSV2BGR);
+
+    // 返回BGR颜色
+    cv::Vec3b color = bgr.at<cv::Vec3b>(0, 0);
+    return cv::Scalar(color[0], color[1], color[2]);
+}
+
 // 绘制检测框
 void drawBox(detectBoxes& boxes, cv::Mat& img, std::string outputName, std::string outputDirPath) {
 
     // 遍历所有检测框
     for (const auto& box : boxes) {
+        auto color = getColor(box.classId);
         // 绘制矩形框
-        cv::rectangle(img, cv::Point(box.left, box.top), cv::Point(box.right, box.bottom), cv::Scalar(0, 255, 0), 2);
+        cv::rectangle(img, cv::Point(box.left, box.top), cv::Point(box.right, box.bottom), color, 2);
 
         // 准备标签内容
         char label[100];
@@ -100,7 +121,7 @@ void drawBox(detectBoxes& boxes, cv::Mat& img, std::string outputName, std::stri
         cv::rectangle(img,
                       cv::Point(box.left, box.top - textSize.height - baseline),
                       cv::Point(box.left + textSize.width, box.top),
-                      cv::Scalar(0, 255, 0), cv::FILLED);
+                      color, cv::FILLED);
 
         // 绘制标签文本
         cv::putText(img, label, cv::Point(box.left, box.top - baseline),
@@ -120,10 +141,11 @@ void drawBox(detectBoxes& boxes, cv::Mat& img, std::string outputName, std::stri
 
 // draw segmentation mask
 void drawSegmentation(const segmentBoxes& boxes, cv::Mat& img, std::string outputName, std::string outputDirPath) {
-      // 遍历所有检测框
+    // 遍历所有检测框
     for (const auto& box : boxes) {
+        auto color = getColor(box.classId);
         // 绘制矩形框
-        cv::rectangle(img, cv::Point(box.left, box.top), cv::Point(box.right, box.bottom), cv::Scalar(0, 255, 0), 2);
+        cv::rectangle(img, cv::Point(box.left, box.top), cv::Point(box.right, box.bottom), color, 2);
 
         // 准备标签内容
         char label[100];
@@ -138,7 +160,7 @@ void drawSegmentation(const segmentBoxes& boxes, cv::Mat& img, std::string outpu
         cv::rectangle(img,
                       cv::Point(box.left, box.top - textSize.height - baseline),
                       cv::Point(box.left + textSize.width, box.top),
-                      cv::Scalar(0, 255, 0), cv::FILLED);
+                      color, cv::FILLED);
 
         // 绘制标签文本
         cv::putText(img, label, cv::Point(box.left, box.top - baseline),
@@ -146,23 +168,32 @@ void drawSegmentation(const segmentBoxes& boxes, cv::Mat& img, std::string outpu
 
         // 绘制分割掩码
         if (box.maskImg && !box.maskImg->empty()) {
-            cv::Mat mask = *box.maskImg;
+            cv::Mat mask = *box.maskImg; // 单通道，0/255
             cv::Rect roi(box.left, box.top, box.width, box.height);
             cv::Mat image_roi = img(roi);
 
-            cv::Mat color_img(mask.size(), image_roi.type(), cv::Scalar(0, 255,0));
+            cv::Mat color_img(mask.size(), image_roi.type(), color);
 
-            cv::Mat mask3;
-            cv::cvtColor(mask, mask3, cv::COLOR_GRAY2BGR);
+            float alpha = 0.4f; // 透明度
 
-            // 做alpha混合（只在mask为1的地方）
-            float alpha = 0.4; // 透明度
-            image_roi = image_roi.mul(1 - alpha, 1.0); // 原图部分
-            color_img = color_img.mul(alpha, 1.0);     // 颜色部分
+            // 转为float做混合
+            cv::Mat image_roi_f, color_img_f, blend_f;
+            image_roi.convertTo(image_roi_f, CV_32FC3);
+            color_img.convertTo(color_img_f, CV_32FC3);
 
-            // 只在mask为1的地方相加
-            image_roi.copyTo(image_roi, 1 - mask3); // mask为0的地方保持原图
-            cv::add(image_roi, color_img.mul(mask3), image_roi, mask3); // mask为1的地方混合
+            // 混合
+            blend_f = image_roi_f * (1.0f - alpha) + color_img_f * alpha;
+            blend_f.convertTo(blend_f, image_roi.type());
+
+            // 只在mask为1（255）的地方拷贝混合结果
+            // mask 必须是单通道，0/255
+            blend_f.copyTo(image_roi, mask);
+
+            // 可选：调试输出
+            // cv::imwrite("debug_mask.jpg", mask);
+            // cv::imwrite("debug_color_img.jpg", color_img);
+            // cv::imwrite("debug_blend.jpg", blend_f);
+            // cv::imwrite("debug_image_roi.jpg", image_roi);
         }
     }
 

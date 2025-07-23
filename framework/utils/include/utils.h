@@ -98,6 +98,7 @@ void restrictBox(T& box, const int img_w, const int img_h){
 };
 
 // draw functions only for debug
+cv::Scalar getColor(int classId);
 void drawBox(detectBoxes& boxes, cv::Mat& img, std::string outputName, std::string outputDirPath = "./detect_result");
 void drawSegmentation(const segmentBoxes& boxes, cv::Mat& img, std::string outputName, std::string outputDirPath = "./segment_result");
 // void drawLandmark();

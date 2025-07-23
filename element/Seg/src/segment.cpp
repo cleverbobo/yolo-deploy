@@ -7,7 +7,7 @@ segment::segment(const std::string& modelPath, const yoloType& type, const int d
     
     // Initialize algorithm info
     YOLOConfig yoloConfig = getYOLOConfig(type);
-
+    m_anchors = yoloConfig.anchors;
     m_mean = yoloConfig.mean;
     m_std = yoloConfig.std;
     m_bgr2rgb = yoloConfig.bgr2rgb;
