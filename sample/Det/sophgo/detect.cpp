@@ -31,12 +31,21 @@ int main(int argc, char** argv) {
         .default_value(0)
         .scan<'d', int>();
     
+    detect_parser.add_argument("-log", "--logLevel")
+        .help("Set log level, default is info")
+        .default_value(std::string("info"))
+        .choices("debug", "info", "warning", "error", "critical");
+    
     detect_parser.add_argument("-o", "--outputDir")
         .help("Path to your output picture directory with dectection result. Default is `./detect_result`")
         .default_value("./detect_result/");
     
     // parse the command line arguments
     detect_parser.parse_args(argc, argv);
+
+    // set log level
+    std::string logLevel = detect_parser.get<std::string>("--logLevel");
+    logInit(logLevel);
 
     std::string modelPath = detect_parser.get<std::string>("--model");
     isFileExist(modelPath);

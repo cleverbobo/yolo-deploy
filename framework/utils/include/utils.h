@@ -23,6 +23,7 @@ int argmax(const float* data, int length);
 // algorithm functions
 template <typename T = detectBoxes>
 void NMS(T& inputBox, T& outputBox, float nmsThreshold) {
+    YOLO_DEBUG("NMS start, inputBox size: {}, nmsThreshold: {}", inputBox.size(), nmsThreshold);
     if (inputBox.empty()) {
         return;
     }
@@ -43,6 +44,10 @@ void NMS(T& inputBox, T& outputBox, float nmsThreshold) {
         pData[i * 5 + 1] = sorted_dets[i].top;
         pData[i * 5 + 2] = sorted_dets[i].right;
         pData[i * 5 + 3] = sorted_dets[i].bottom;
+
+        // update width and height
+        sorted_dets[i].width = sorted_dets[i].right - sorted_dets[i].left;
+        sorted_dets[i].height = sorted_dets[i].bottom - sorted_dets[i].top;
         pData[i * 5 + 4] = sorted_dets[i].width * sorted_dets[i].height;
     }
   
@@ -80,6 +85,7 @@ void NMS(T& inputBox, T& outputBox, float nmsThreshold) {
   
         }
     }
+    YOLO_DEBUG("NMS end, outputBox size: {}", outputBox.size());
 };
 
 void getAspectParam(int src_w, int src_h, int dst_w, int dst_h, 

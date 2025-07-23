@@ -26,6 +26,12 @@ int main(int argc, char** argv) {
         .help("Path to your input file Path. Support jpg, vide0(h264/h265), rtsp/rtmp, video_device")
         .default_value(std::string("./test.jpg"));
     
+    segment_parser.add_argument("-log", "--logLevel")
+        .help("Set log level, default is info")
+        .default_value(std::string("info"))
+        .choices("debug", "info", "warning", "error", "critical");
+    
+    
     segment_parser.add_argument("-d", "--deviceId")
         .help("Device id, default is 0")
         .default_value(0)
@@ -37,6 +43,10 @@ int main(int argc, char** argv) {
     
     // parse the command line arguments
     segment_parser.parse_args(argc, argv);
+
+    // set log level
+    std::string logLevel = segment_parser.get<std::string>("--logLevel");
+    logInit(logLevel);
 
     std::string modelPath = segment_parser.get<std::string>("--model");
     isFileExist(modelPath);
