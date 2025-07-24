@@ -7,6 +7,8 @@ class BMNNHandle;
 class BMNNTensor;
 class bm_image;
 typedef struct bmcv_padding_atrr_s bmcv_padding_atrr_t;
+typedef struct bm_shape_s bm_shape_t;
+
 
 class sophgo_segment : public segment {
 public:
@@ -27,7 +29,7 @@ private:
     stateType inference();
     stateType postProcess(const bm_image* inputImages, std::vector<segmentBoxes>& outputBoxes, const int num);
     
-    stateType getSegmentBox(const bm_image* inputImages, segmentBoxes& outputBoxes, std::shared_ptr<BMNNTensor> protoTensor);
+    stateType sophgo_segment::getSegmentBox(const bm_image* inputImages, segmentBoxes& outputBoxes, float* proto_data, const bm_shape_t* proto_shape);
     stateType yolov5Post(const bm_image* inputImages, std::vector<segmentBoxes>& outputBoxes, const int num);
     stateType yolov6Post(const bm_image* inputImages, std::vector<segmentBoxes>& outputBoxes, const int num);
     stateType yolov7Post(const bm_image* inputImages, std::vector<segmentBoxes>& outputBoxes, const int num);

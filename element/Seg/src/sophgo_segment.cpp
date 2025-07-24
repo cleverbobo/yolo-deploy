@@ -70,6 +70,7 @@ sophgo_segment::sophgo_segment(const std::string& modelPath, const yoloType& typ
                                      input_shape,
                                      output_shape,
                                      m_max_batch };
+    printAlgorithmInfo();
 }
 
 sophgo_segment::~sophgo_segment() {
@@ -189,7 +190,7 @@ stateType sophgo_segment::postProcess(const bm_image* inputImages, std::vector<s
     
 }
 
-stateType sophgo_segment::getSegmentBox(const bm_image* inputImages, segmentBoxes& outputBoxes, std::shared_ptr<BMNNTensor> protoTensor) {
+stateType sophgo_segment::getSegmentBox(const bm_image* inputImages, segmentBoxes& outputBoxes, float* proto_data, const bm_shape_t* proto_shape) {
     if (outputBoxes.empty()) {
         YOLO_WARN("outputBoxes is empty in sophgo_segment::getSegmentBox");
         return stateType::SUCCESS;
@@ -205,11 +206,10 @@ stateType sophgo_segment::getSegmentBox(const bm_image* inputImages, segmentBoxe
         maskVec[i] = cv::Mat(1,m_seg_feature_size, CV_32FC1, outputBoxes[i].mask.data());
     }
     
-    auto proto_shape = protoTensor->get_shape();
-    int proto_height = protoTensor->get_shape()->dims[2];
-    int proto_width = protoTensor->get_shape()->dims[3];
 
-    float* proto_data = reinterpret_cast<float*>(protoTensor->get_cpu_data());
+    int proto_height = proto_shape->dims[2];
+    int proto_width = proto_shape->dims[3];
+
     cv::Mat proto(proto_shape->num_dims, proto_shape->dims,  CV_32F, proto_data);
 
     int img_w = inputImages->width;
@@ -281,6 +281,10 @@ stateType sophgo_segment::yolov5Post(const bm_image* inputImages, std::vector<se
         outputTensors[i] = m_bmNetwork->outputTensor(i);
     }
 
+    auto proto_shape = outputTensors[m_output_num - 1]->get_shape();
+    auto proto_data = reinterpret_cast<float*>(outputTensors[m_output_num - 1]->get_cpu_data());
+    int proto_size = bmrt_shape_count(proto_shape) / proto_shape->dims[0];
+    
     for(int batch_idx = 0; batch_idx < num; ++batch_idx)
     {
       segmentBoxes yolobox_vec;
@@ -448,7 +452,8 @@ stateType sophgo_segment::yolov5Post(const bm_image* inputImages, std::vector<se
       }
 
       
-      getSegmentBox(inputImages+batch_idx, resVec, outputTensors[m_output_num - 1]);
+      getSegmentBox(inputImages+batch_idx, resVec, proto_data, proto_shape);
+      proto_data += proto_size;
 
       YOLO_DEBUG("batch_id: {}, outputbox number is {}", batch_idx, resVec.size());
       outputBoxes.push_back(resVec);
@@ -462,6 +467,9 @@ stateType sophgo_segment::yolov6Post(const bm_image* inputImages, std::vector<se
     float* output_data = reinterpret_cast<float*>(output_tensor->get_cpu_data());
 
     auto seg_proto_tensor = m_bmNetwork->outputTensor(1);
+    auto proto_shape = seg_proto_tensor->get_shape();
+    auto proto_data = reinterpret_cast<float*>(seg_proto_tensor->get_cpu_data());
+    int proto_size = bmrt_shape_count(proto_shape) / proto_shape->dims[0];
 
     auto seg_mask_tensor = m_bmNetwork->outputTensor(2);
     float* seg_mask_data = reinterpret_cast<float*>(seg_mask_tensor->get_cpu_data());
@@ -571,7 +579,8 @@ stateType sophgo_segment::yolov6Post(const bm_image* inputImages, std::vector<se
             }
         }
 
-        getSegmentBox(inputImages+batch_idx, resVec, seg_proto_tensor);
+        getSegmentBox(inputImages+batch_idx, resVec, proto_data, proto_shape);
+        proto_data += proto_size;
         YOLO_DEBUG("batch_id: {}, outputbox number is {}", batch_idx, resVec.size());
         outputBoxes.push_back(resVec);
     }
@@ -585,6 +594,10 @@ stateType sophgo_segment::yolov7Post(const bm_image* inputImages, std::vector<se
 stateType sophgo_segment::yolov8Post(const bm_image* inputImages, std::vector<segmentBoxes>& outputBoxes, const int num) {
     auto det_output_tensor = m_bmNetwork->outputTensor(0);
     auto seg_proto_tensor = m_bmNetwork->outputTensor(1);
+
+    auto proto_shape = seg_proto_tensor->get_shape();
+    auto proto_data = reinterpret_cast<float*>(seg_proto_tensor->get_cpu_data());
+    int proto_size = bmrt_shape_count(proto_shape) / proto_shape->dims[0];
 
     float* det_output_data = reinterpret_cast<float*>(det_output_tensor->get_cpu_data());
 
@@ -683,7 +696,8 @@ stateType sophgo_segment::yolov8Post(const bm_image* inputImages, std::vector<se
             }
         }
 
-        getSegmentBox(inputImages+batch_idx, resVec, seg_proto_tensor);
+        getSegmentBox(inputImages+batch_idx, resVec, proto_data, proto_shape);
+        proto_data += proto_size;
 
         YOLO_DEBUG("batch_id: {}, outputbox number is {}", batch_idx, resVec.size());
         outputBoxes.push_back(resVec);
