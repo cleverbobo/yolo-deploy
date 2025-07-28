@@ -7,16 +7,22 @@ if (NOT DEFINED TARGET_ARCH)
     set(TARGET_ARCH tensorrt)
 endif()
 
-message(STATUS "[INFO] BUILD DET SAMPLE FOR TARGET_ARCH: ${TARGET_ARCH}")
-message(STATUS "[INFO] BUILD DET SAMPLE FOR TARGET_ARCH: ${TARGET_ARCH}")
+message(STATUS "[INFO] BUILD Seg SAMPLE FOR TARGET_ARCH: ${TARGET_ARCH}")
+message(STATUS "[INFO] BUILD Seg SAMPLE FOR TARGET_ARCH: ${TARGET_ARCH}")
 
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG}  -fprofile-arcs")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fPIC -rdynamic")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -rdynamic")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -rdynamic")
 
+# 获取当前 CMakeLists.txt 所在的路径
+set(PROJECT_SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR})
+
+# 设置可执行文件输出到 build 目录
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/build")
+
 # 公共的头文件
-include_directories(../../../element/Det/include)
+include_directories(../../../element/Seg/include)
 include_directories(../../../framework/include)
 include_directories(../../../framework/utils/include)
 

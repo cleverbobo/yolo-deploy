@@ -91,12 +91,14 @@ trt_segment::trt_segment(const std::string& modelPath, const yoloType& type, con
     m_output_num = m_outputNames.size();
     m_output_det_dim = m_trtEngine->getTensorShape(m_outputNames[0]).nbDims;
     m_output_seg_dim = m_trtEngine->getTensorShape(m_outputNames[m_output_num-1]).nbDims;
-    m_seg_feature_size = m_trtEngine->getTensorShape(m_outputNames[m_output_num-1]).d[1];
+    
 
     m_nout = m_trtEngine->getTensorShape(m_outputNames[0]).d[m_output_det_dim - 1];
     if (m_yoloType == yoloType::YOLOV6) {
+        m_seg_feature_size = m_trtEngine->getTensorShape(m_outputNames[m_output_num-2]).d[1];
         m_class_num = m_nout - 5;
     } else {
+        m_seg_feature_size = m_trtEngine->getTensorShape(m_outputNames[m_output_num-1]).d[1];
         m_class_num = m_nout - 5 - m_seg_feature_size;
     }
     
@@ -345,7 +347,8 @@ stateType trt_segment::yolov5Post(const Mat* inputImages, std::vector<segmentBox
       segmentBoxes yolobox_vec;
   
       int box_num = 0;
-      for(auto outName : m_outputNames){
+      auto outputDetNames = std::vector<char*>(m_outputNames.begin(), m_outputNames.end() - 1);
+      for(auto outName : outputDetNames){
         auto output_shape = m_trtEngine->getTensorShape(outName);
         auto output_dims = output_shape.nbDims;
         YOLO_CHECK(output_dims == 5, "The Yolov5 output's dim must be five. which means to [batch, anchor_num, feature_height,feature_width,feature]")
@@ -365,7 +368,7 @@ stateType trt_segment::yolov5Post(const Mat* inputImages, std::vector<segmentBox
       std::vector<float> decoded_data(box_num*out_nout, -1);
       float *dst = decoded_data.data();
 
-      for(int head_idx = 0; head_idx < m_output_num; head_idx++) {
+      for(int head_idx = 0; head_idx < m_output_num - 1; head_idx++) {
           auto output_shape = m_trtEngine->getTensorShape(m_outputNames[head_idx]);
           int feat_c = output_shape.d[1];
           int feat_h = output_shape.d[2];
@@ -404,8 +407,9 @@ stateType trt_segment::yolov5Post(const Mat* inputImages, std::vector<segmentBox
               dst[6] -= 5;
   #endif
               // add seg feature
-              for(int d = m_nout - m_seg_feature_size; d < m_nout; ++d) {
-                dst[d] = output_data_ptr[d];
+              int idx = 7;
+              for(int d = m_nout - m_seg_feature_size; d < m_nout; ++d, ++idx) {
+                dst[idx] = output_data_ptr[d];
               }
 
               dst += out_nout;

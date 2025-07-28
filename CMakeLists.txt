@@ -70,5 +70,8 @@ elseif(${TARGET_ARCH} STREQUAL "tensorrt")
     checkAndAddSample(sample/Det/tensorrt)
     add_dependencies(detect_tensorrt.run detect)
 
+    checkAndAddElement(sample/Seg/tensorrt)
+    add_dependencies(segment_tensorrt.run segment)
+
 endif()
 

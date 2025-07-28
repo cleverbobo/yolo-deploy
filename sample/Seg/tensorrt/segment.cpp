@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
     segment_parser.add_argument("-m", "--model")
         .required()
         .help("Path to your model file")
-        .default_value(std::string("./yolov5.bmodel"));
+        .default_value(std::string("./yolov5.engine"));
     
     segment_parser.add_argument("-t", "--yoloType")
         .required()

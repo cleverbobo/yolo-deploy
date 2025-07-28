@@ -349,8 +349,9 @@ stateType sophgo_segment::yolov5Post(const bm_image* inputImages, std::vector<se
               dst[6] -= 5;
   #endif
               // add seg feature
-              for(int d = m_nout - m_seg_feature_size; d < m_nout; d++){
-                dst[d] = output_data_ptr[d];
+              int idx = 7;
+              for(int d = m_nout - m_seg_feature_size; d < m_nout; d++, idx++){
+                dst[idx] = output_data_ptr[d];
               }
 
               dst += out_nout;
