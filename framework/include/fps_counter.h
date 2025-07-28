@@ -15,7 +15,7 @@ class fpsCounter : public NoCopyable {
         void add(int count = 1);
         float getTempFps();
         float getAvgFps();
-        void summary();
+        void summary(bool);
         
     private:
         float m_tempFps;

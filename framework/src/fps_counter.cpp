@@ -52,10 +52,11 @@ float fpsCounter::getTempFps() {
 }
 
 float fpsCounter::getAvgFps() {
+    summary(false);
     return m_avgFps;
 }
 
-void fpsCounter::summary() {
+void fpsCounter::summary(bool printFlag = true) {
     std::lock_guard<std::mutex> lock(m_mutex);
     // flush the current statistics
     auto now = std::chrono::steady_clock::now();
@@ -69,8 +70,8 @@ void fpsCounter::summary() {
             m_avgFps = 0.7 * m_avgFps + 0.3 * m_tempFps; 
         }
     }
-
-    YOLO_INFO("FPS Counter [{}]: Temp FPS: {:.2f}, Final Avg FPS: {:.2f}", m_name, m_tempFps, m_avgFps);
+    if(printFlag)
+        YOLO_INFO("FPS Counter [{}]: Temp FPS: {:.2f}, Final Avg FPS: {:.2f}", m_name, m_tempFps, m_avgFps);
     m_frameCount = 0;
     m_startTime = now; // Reset start time for next summary
 }

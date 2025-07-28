@@ -2,8 +2,8 @@
 #include "utils.h"
 
 // debug
-#ifdef YOLO_DEBUG
-#include <cnpy.h>
+#ifdef _DEBUG
+#include "cnpy.h"
 #endif
 
 void trt_logger::log(Severity severity, nvinfer1::AsciiChar const* msg) noexcept{
@@ -358,7 +358,7 @@ stateType trt_segment::yolov5Post(const Mat* inputImages, std::vector<segmentBox
   #if USE_MULTICLASS_NMS
       int out_nout = m_nout;
   #else
-      int out_nout = 7;
+      int out_nout = 7 + m_seg_feature_size;
   #endif
   
       // get transformed confidence threshold   
