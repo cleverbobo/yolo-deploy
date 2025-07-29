@@ -393,8 +393,9 @@ stateType trt_segment::yolov5Post(const Mat* inputImages, std::vector<segmentBox
                 dst[3] = pow((sigmoid(output_data_ptr[3]) * 2), 2) * m_anchors[head_idx][anchor_idx][1];
                 dst[4] = sigmoid(output_data_ptr[4]);
   #if USE_MULTICLASS_NMS
-              for(int d = 5; d < nout; d++)
+              for(int d = 5; d < m_nout - m_seg_feature_size; d++)
                   dst[d] = output_data_ptr[d];
+              int idx = m_nout - m_seg_feature_size;
   #else
               dst[5] = output_data_ptr[5];
               dst[6] = 5;
@@ -405,9 +406,9 @@ stateType trt_segment::yolov5Post(const Mat* inputImages, std::vector<segmentBox
                   }
               }
               dst[6] -= 5;
+              int idx = 7;
   #endif
               // add seg feature
-              int idx = 7;
               for(int d = m_nout - m_seg_feature_size; d < m_nout; ++d, ++idx) {
                 dst[idx] = output_data_ptr[d];
               }
@@ -440,16 +441,40 @@ stateType trt_segment::yolov5Post(const Mat* inputImages, std::vector<segmentBox
           int class_id = j;
           if (confidence > box_transformed_m_confThreshold)
           {
-              YoloV5Box box;
+                segmentBox box;
+
+                box.left = centerX - width / 2;
+                box.top = centerY - height / 2;
+                box.right = box.left + width;
+                box.bottom = box.top + height;
+
+                // clip
+                box.left = std::min(std::max(box.left,0), m_net_w);
+                box.top = std::min(std::max(box.top,0), m_net_h);
+                box.right = std::min(std::max(box.right,0), m_net_w);
+                box.bottom = std::min(std::max(box.bottom,0), m_net_h);
+
+                // update w,h
+                box.width = box.right - box.left;
+                box.height = box.bottom - box.top;
+
+                // update class id and score
+                box.classId = class_id;
+                box.score = sigmoid(confidence) * score;
+                
+                if (!agnostic){
+                    // update box position
+                    box.left +=  class_id * max_wh;
+                    box.top += class_id * max_wh;
+                    box.right += class_id * max_wh;
+                    box.bottom += class_id * max_wh;
+                }
+
+                // segment mask
+                box.mask.resize(m_seg_feature_size);
+                std::memcpy(box.mask.data(), output_data_ptr + m_nout - m_seg_feature_size, m_seg_feature_size * sizeof(float));
   
-              box.x = std::max(centerX - width / 2 + class_id * max_wh,0.0f);
-              box.y = std::max(centerY - height / 2 + class_id * max_wh,0.0f);
-              box.width = width;
-              box.height = height;
-              box.class_id = class_id;
-              box.score = sigmoid(confidence) * score;
-  
-              yolobox_vec.push_back(box);
+                yolobox_vec.push_back(box);
           }
         }
   #else
@@ -541,12 +566,6 @@ stateType trt_segment::yolov6Post(const Mat* inputImages, std::vector<segmentBox
         auto output_shape = m_trtEngine->getTensorShape(m_outputNames[0]);
         YOLO_CHECK(output_shape.nbDims == 3, "The {} output's dim must be three. which means to [batch, box_num, feature]",enumName(m_yoloType));
         int box_num = output_shape.d[1];
-
-        #if USE_MULTICLASS_NMS
-            int out_nout = m_nout;
-        #else
-            int out_nout = 7;
-        #endif
         
         float *batch_mask_data = seg_mask_data + batch_idx * box_num * (m_seg_feature_size + 1);
         float *batch_output_data = m_outputCpuMem[0].get() + batch_idx * box_num * m_nout;
@@ -563,28 +582,32 @@ stateType trt_segment::yolov6Post(const Mat* inputImages, std::vector<segmentBox
                     float confidence = batch_output_data[j + 5];
                     int class_id = j;
                     if (confidence * score > m_confThreshold) {
-                        center_x = batch_output_data[0];
-                        center_y = batch_output_data[1];
-                        width = batch_output_data[2];
-                        height = batch_output_data[3];
-                    }
-                    segmentBox box;
 
-                    box.left = center_x - width / 2;
-                    box.top = center_y - height / 2;
-                    box.right = box.left + width;
-                    box.bottom = box.top + height;  
-                    box.classId = class_id;
-                    box.score = confidence * score;
+                         float center_x = batch_output_data[0];
+                        float center_y = batch_output_data[1];
+                        float width = batch_output_data[2];
+                        float height = batch_output_data[3];
 
-                    if (!agnostic) {
-                        box.left += class_id * max_wh;
-                        box.top += class_id * max_wh;
-                        box.right += class_id * max_wh;
-                        box.bottom += class_id * max_wh;
+                        segmentBox box;
+                        box.left = center_x - width / 2;
+                        box.top = center_y - height / 2;
+                        box.right = box.left + width;
+                        box.bottom = box.top + height;
+                        
+                        if (!agnostic) {
+                            box.left += class_id * max_wh;
+                            box.top += class_id * max_wh;
+                            box.right += class_id * max_wh;
+                            box.bottom += class_id * max_wh;
+                        }
+                        box.classId = class_id;
+                        box.score = confidence * score;
+
+                        // segment mask
+                        box.mask.resize(m_seg_feature_size);
+                        std::memcpy(box.mask.data(), batch_mask_data + 1, m_seg_feature_size * sizeof(float));
+                        yolobox_vec.push_back(box);            
                     }
-                    yolobox_vec.push_back(box);
-                    
                 }
             #else
                 int class_id = argmax(batch_output_data + 5, m_class_num);
@@ -616,10 +639,9 @@ stateType trt_segment::yolov6Post(const Mat* inputImages, std::vector<segmentBox
 
                     yolobox_vec.push_back(box);
                 }
-                batch_output_data += m_nout;
-                batch_mask_data += m_seg_feature_size + 1;
-        
             #endif
+            batch_output_data += m_nout;
+            batch_mask_data += m_seg_feature_size + 1;
         }
         segmentBoxes resVec;
         NMS(yolobox_vec, resVec, m_nmsThreshold);
@@ -666,12 +688,6 @@ stateType trt_segment::yolov8Post(const Mat* inputImages, std::vector<segmentBox
         YOLO_CHECK(output_shape.nbDims == 3, "The {} output's dim must be three. which means to [batch, box_num, feature]",enumName(m_yoloType));
         int box_num = output_shape.d[1];
 
-        #if USE_MULTICLASS_NMS
-            int out_nout = m_nout;
-        #else
-            int out_nout = 7;
-        #endif
-        
         float *batch_output_data = m_outputCpuMem[0].get() + batch_idx * box_num * m_nout;
         int max_wh = 7680;
         bool agnostic = false;
@@ -681,28 +697,32 @@ stateType trt_segment::yolov8Post(const Mat* inputImages, std::vector<segmentBox
                     float confidence = batch_output_data[j + 4];
                     int class_id = j;
                     if (confidence > m_confThreshold) {
-                        center_x = batch_output_data[0];
-                        center_y = batch_output_data[1];
-                        width = batch_output_data[2];
-                        height = batch_output_data[3];
-                    }
-                    segmentBox box;
+                        float center_x = batch_output_data[0];
+                        float center_y = batch_output_data[1];
+                        float width = batch_output_data[2];
+                        float height = batch_output_data[3];
 
-                    box.left = center_x - width / 2;
-                    box.top = center_y - height / 2;
-                    box.right = box.left + width;
-                    box.bottom = box.top + height;  
-                    box.classId = class_id;
-                    box.score = confidence;
+                        segmentBox box;
+                        box.left = center_x - width / 2;
+                        box.top = center_y - height / 2;
+                        box.right = box.left + width;
+                        box.bottom = box.top + height;
+                        
+                        if (!agnostic) {
+                            box.left += class_id * max_wh;
+                            box.top += class_id * max_wh;
+                            box.right += class_id * max_wh;
+                            box.bottom += class_id * max_wh;
+                        }
+                        box.classId = class_id;
+                        box.score = confidence;
 
-                    if (!agnostic) {
-                        box.left += class_id * max_wh;
-                        box.top += class_id * max_wh;
-                        box.right += class_id * max_wh;
-                        box.bottom += class_id * max_wh;
+                        // segment mask
+                        box.mask.resize(m_seg_feature_size);
+                        std::memcpy(box.mask.data(), batch_output_data + m_nout - m_seg_feature_size, m_seg_feature_size * sizeof(float));
+
+                        yolobox_vec.push_back(box);
                     }
-                    yolobox_vec.push_back(box);
-                    
                 }
             #else
                 int class_id = argmax(batch_output_data + 4, m_class_num);
@@ -734,9 +754,10 @@ stateType trt_segment::yolov8Post(const Mat* inputImages, std::vector<segmentBox
 
                     yolobox_vec.push_back(box);
                 }
-                batch_output_data += m_nout;
+                
         
             #endif
+            batch_output_data += m_nout;
         }
 
         segmentBoxes resVec;

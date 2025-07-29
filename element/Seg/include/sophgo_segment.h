@@ -29,7 +29,7 @@ private:
     stateType inference();
     stateType postProcess(const bm_image* inputImages, std::vector<segmentBoxes>& outputBoxes, const int num);
     
-    stateType sophgo_segment::getSegmentBox(const bm_image* inputImages, segmentBoxes& outputBoxes, float* proto_data, const bm_shape_t* proto_shape);
+    stateType getSegmentBox(const bm_image* inputImages, segmentBoxes& outputBoxes, float* proto_data, const bm_shape_t* proto_shape);
     stateType yolov5Post(const bm_image* inputImages, std::vector<segmentBoxes>& outputBoxes, const int num);
     stateType yolov6Post(const bm_image* inputImages, std::vector<segmentBoxes>& outputBoxes, const int num);
     stateType yolov7Post(const bm_image* inputImages, std::vector<segmentBoxes>& outputBoxes, const int num);

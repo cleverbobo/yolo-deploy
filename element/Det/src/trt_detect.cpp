@@ -320,7 +320,7 @@ stateType trt_detect::yolov5Post(const Mat* inputImages, std::vector<detectBoxes
                 dst[3] = pow((sigmoid(output_data_ptr[3]) * 2), 2) * m_anchors[head_idx][anchor_idx][1];
                 dst[4] = sigmoid(output_data_ptr[4]);
   #if USE_MULTICLASS_NMS
-              for(int d = 5; d < nout; d++)
+              for(int d = 5; d < m_nout; d++)
                   dst[d] = output_data_ptr[d];
   #else
               dst[5] = output_data_ptr[5];
@@ -361,16 +361,36 @@ stateType trt_detect::yolov5Post(const Mat* inputImages, std::vector<detectBoxes
           int class_id = j;
           if (confidence > box_transformed_m_confThreshold)
           {
-              YoloV5Box box;
+              detectBox box;
   
-              box.x = std::max(centerX - width / 2 + class_id * max_wh,0.0f);
-              box.y = std::max(centerY - height / 2 + class_id * max_wh,0.0f);
-              box.width = width;
-              box.height = height;
-              box.class_id = class_id;
-              box.score = sigmoid(confidence) * score;
-  
-              yolobox_vec.push_back(box);
+              box.left = centerX - width / 2;
+                box.top = centerY - height / 2;
+                box.right = box.left + width;
+                box.bottom = box.top + height;
+
+                // clip
+                box.left = std::min(std::max(box.left,0), m_net_w);
+                box.top = std::min(std::max(box.top,0), m_net_h);
+                box.right = std::min(std::max(box.right,0), m_net_w);
+                box.bottom = std::min(std::max(box.bottom,0), m_net_h);
+
+                // update w,h
+                box.width = box.right - box.left;
+                box.height = box.bottom - box.top;
+
+                // update class id and score
+                box.classId = class_id;
+                box.score = sigmoid(confidence) * score;
+                
+                if (!agnostic){
+                    // update box position
+                    box.left +=  class_id * max_wh;
+                    box.top += class_id * max_wh;
+                    box.right += class_id * max_wh;
+                    box.bottom += class_id * max_wh;
+                }
+                
+                yolobox_vec.push_back(box);
           }
         }
   #else
@@ -467,27 +487,28 @@ stateType trt_detect::yolov6Post(const Mat* inputImages, std::vector<detectBoxes
                     float confidence = batch_output_data[j + 5];
                     int class_id = j;
                     if (confidence * score > m_confThreshold) {
-                        center_x = batch_output_data[0];
-                        center_y = batch_output_data[1];
-                        width = batch_output_data[2];
-                        height = batch_output_data[3];
-                    }
-                    detectBox box;
+                        float center_x = batch_output_data[0];
+                        float center_y = batch_output_data[1];
+                        float width = batch_output_data[2];
+                        float height = batch_output_data[3];
+                    
+                        detectBox box;
 
-                    box.left = center_x - width / 2;
-                    box.top = center_y - height / 2;
-                    box.right = box.left + width;
-                    box.bottom = box.top + height;  
-                    box.classId = class_id;
-                    box.score = confidence * score;
+                        box.left = center_x - width / 2;
+                        box.top = center_y - height / 2;
+                        box.right = box.left + width;
+                        box.bottom = box.top + height;  
+                        box.classId = class_id;
+                        box.score = confidence * score;
 
-                    if (!agnostic) {
-                        box.left += class_id * max_wh;
-                        box.top += class_id * max_wh;
-                        box.right += class_id * max_wh;
-                        box.bottom += class_id * max_wh;
+                        if (!agnostic) {
+                            box.left += class_id * max_wh;
+                            box.top += class_id * max_wh;
+                            box.right += class_id * max_wh;
+                            box.bottom += class_id * max_wh;
+                        }
+                        yolobox_vec.push_back(box);
                     }
-                    yolobox_vec.push_back(box);
                     
                 }
             #else
@@ -516,9 +537,10 @@ stateType trt_detect::yolov6Post(const Mat* inputImages, std::vector<detectBoxes
 
                     yolobox_vec.push_back(box);
                 }
-                batch_output_data += m_nout;
+                
         
             #endif
+            batch_output_data += m_nout;
         }
         detectBoxes resVec;
         NMS(yolobox_vec, resVec, m_nmsThreshold);
@@ -575,28 +597,28 @@ stateType trt_detect::yolov8Post(const Mat* inputImages, std::vector<detectBoxes
                     float confidence = batch_output_data[j + 4];
                     int class_id = j;
                     if (confidence > m_confThreshold) {
-                        center_x = batch_output_data[0];
-                        center_y = batch_output_data[1];
-                        width = batch_output_data[2];
-                        height = batch_output_data[3];
-                    }
-                    detectBox box;
-
-                    box.left = center_x - width / 2;
-                    box.top = center_y - height / 2;
-                    box.right = box.left + width;
-                    box.bottom = box.top + height;  
-                    box.classId = class_id;
-                    box.score = confidence;
-
-                    if (!agnostic) {
-                        box.left += class_id * max_wh;
-                        box.top += class_id * max_wh;
-                        box.right += class_id * max_wh;
-                        box.bottom += class_id * max_wh;
-                    }
-                    yolobox_vec.push_back(box);
+                        float center_x = batch_output_data[0];
+                        float center_y = batch_output_data[1];
+                        float width = batch_output_data[2];
+                        float height = batch_output_data[3];
                     
+                        detectBox box;
+
+                        box.left = center_x - width / 2;
+                        box.top = center_y - height / 2;
+                        box.right = box.left + width;
+                        box.bottom = box.top + height;  
+                        box.classId = class_id;
+                        box.score = confidence;
+
+                        if (!agnostic) {
+                            box.left += class_id * max_wh;
+                            box.top += class_id * max_wh;
+                            box.right += class_id * max_wh;
+                            box.bottom += class_id * max_wh;
+                        }
+                        yolobox_vec.push_back(box);
+                    }
                 }
             #else
                 int class_id = argmax(batch_output_data + 4, m_class_num);
@@ -624,9 +646,10 @@ stateType trt_detect::yolov8Post(const Mat* inputImages, std::vector<detectBoxes
 
                     yolobox_vec.push_back(box);
                 }
-                batch_output_data += m_nout;
+                
         
             #endif
+            batch_output_data += m_nout;
         }
 
         detectBoxes resVec;

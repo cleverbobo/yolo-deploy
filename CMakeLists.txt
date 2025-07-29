@@ -7,6 +7,11 @@ if (NOT DEFINED TARGET_ARCH)
 endif()
 add_compile_definitions("${TARGET_ARCH}")
 
+option(USE_MULTICLASS_NMS "Enable multiclass NMS" OFF)
+if(USE_MULTICLASS_NMS)
+    add_compile_definitions(USE_MULTICLASS_NMS=1)
+endif()
+
 message(STATUS "[INFO] START BUILD FOR TARGET_ARCH: ${TARGET_ARCH}")
 
 if (NOT DEFINED CMAKE_BUILD_TYPE)
@@ -14,15 +19,8 @@ if (NOT DEFINED CMAKE_BUILD_TYPE)
 endif()
 message(STATUS "[INFO] CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    # 设置为debug模式
-    set(CMAKE_BUILD_TYPE Debug)
-    # 编译优化设置为O0
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
-else()
-    # 编译优化设置为O0
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
-endif()
+set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS_DEBUG} -O0")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 
 # 公共的第三方库的头文件查找路径
 include_directories(3rdparty/argparse-3.2/include)

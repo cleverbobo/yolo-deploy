@@ -35,7 +35,12 @@ sophgo_detect::sophgo_detect(const std::string& modelPath, const yoloType& type,
     m_output_num = m_bmNetwork->outputTensorNum();
     m_output_dim = output_tensor->get_shape()->num_dims;
     m_nout = output_tensor->get_shape()->dims[m_output_dim-1];
-    m_class_num = m_nout - 5;
+    if(m_yoloType <= yoloType::YOLOV7) {
+        m_class_num = m_nout - 5;
+    } else {
+        m_class_num = m_nout - 4;
+    }
+    
 
     // init preprocess data
     m_preprocess_images.resize(m_max_batch);
@@ -267,7 +272,7 @@ stateType sophgo_detect::yolov5Post(const bm_image* inputImages, std::vector<det
                 dst[3] = pow((sigmoid(output_data_ptr[3]) * 2), 2) * m_anchors[head_idx][anchor_idx][1];
                 dst[4] = sigmoid(output_data_ptr[4]);
   #if USE_MULTICLASS_NMS
-              for(int d = 5; d < nout; d++)
+              for(int d = 5; d < m_nout; d++)
                   dst[d] = output_data_ptr[d];
   #else
               dst[5] = output_data_ptr[5];
@@ -308,16 +313,36 @@ stateType sophgo_detect::yolov5Post(const bm_image* inputImages, std::vector<det
           int class_id = j;
           if (confidence > box_transformed_m_confThreshold)
           {
-              YoloV5Box box;
-  
-              box.x = std::max(centerX - width / 2 + class_id * max_wh,0.0f);
-              box.y = std::max(centerY - height / 2 + class_id * max_wh,0.0f);
-              box.width = width;
-              box.height = height;
-              box.class_id = class_id;
-              box.score = sigmoid(confidence) * score;
-  
-              yolobox_vec.push_back(box);
+                detectBox box;
+
+                box.left = centerX - width / 2;
+                box.top = centerY - height / 2;
+                box.right = box.left + width;
+                box.bottom = box.top + height;
+
+                // clip
+                box.left = std::min(std::max(box.left,0), m_net_w);
+                box.top = std::min(std::max(box.top,0), m_net_h);
+                box.right = std::min(std::max(box.right,0), m_net_w);
+                box.bottom = std::min(std::max(box.bottom,0), m_net_h);
+
+                // update w,h
+                box.width = box.right - box.left;
+                box.height = box.bottom - box.top;
+
+                // update class id and score
+                box.classId = class_id;
+                box.score = sigmoid(confidence) * score;
+                
+                if (!agnostic){
+                    // update box position
+                    box.left +=  class_id * max_wh;
+                    box.top += class_id * max_wh;
+                    box.right += class_id * max_wh;
+                    box.bottom += class_id * max_wh;
+                }
+                
+                yolobox_vec.push_back(box);
           }
         }
   #else
@@ -390,12 +415,6 @@ stateType sophgo_detect::yolov6Post(const bm_image* inputImages, std::vector<det
         auto output_shape = output_tensor->get_shape();
         YOLO_CHECK(output_shape->num_dims == 3, "The {} output's dim must be three. which means to [batch, box_num, feature]",enumName(m_yoloType));
         int box_num = output_tensor->get_shape()->dims[1];
-
-        #if USE_MULTICLASS_NMS
-            int out_nout = m_nout;
-        #else
-            int out_nout = 7;
-        #endif
         
         float *batch_output_data = output_data + batch_idx * box_num * m_nout;
         int max_wh = 7680;
@@ -411,28 +430,28 @@ stateType sophgo_detect::yolov6Post(const bm_image* inputImages, std::vector<det
                     float confidence = batch_output_data[j + 5];
                     int class_id = j;
                     if (confidence * score > m_confThreshold) {
-                        center_x = batch_output_data[0];
-                        center_y = batch_output_data[1];
-                        width = batch_output_data[2];
-                        height = batch_output_data[3];
-                    }
-                    detectBox box;
-
-                    box.left = center_x - width / 2;
-                    box.top = center_y - height / 2;
-                    box.right = box.left + width;
-                    box.bottom = box.top + height;  
-                    box.classId = class_id;
-                    box.score = confidence * score;
-
-                    if (!agnostic) {
-                        box.left += class_id * max_wh;
-                        box.top += class_id * max_wh;
-                        box.right += class_id * max_wh;
-                        box.bottom += class_id * max_wh;
-                    }
-                    yolobox_vec.push_back(box);
+                        float center_x = batch_output_data[0];
+                        float center_y = batch_output_data[1];
+                        float width = batch_output_data[2];
+                        float height = batch_output_data[3];
                     
+                        detectBox box;
+
+                        box.left = center_x - width / 2;
+                        box.top = center_y - height / 2;
+                        box.right = box.left + width;
+                        box.bottom = box.top + height;  
+                        box.classId = class_id;
+                        box.score = confidence * score;
+
+                        if (!agnostic) {
+                            box.left += class_id * max_wh;
+                            box.top += class_id * max_wh;
+                            box.right += class_id * max_wh;
+                            box.bottom += class_id * max_wh;
+                        }
+                        yolobox_vec.push_back(box);
+                    }
                 }
             #else
                 int class_id = argmax(batch_output_data + 5, m_class_num);
@@ -460,12 +479,11 @@ stateType sophgo_detect::yolov6Post(const bm_image* inputImages, std::vector<det
 
                     yolobox_vec.push_back(box);
                 }
-                batch_output_data += m_nout;
-        
             #endif
+            batch_output_data += m_nout;
         }
-        detectBoxes resVec;
-        NMS(yolobox_vec, resVec, m_nmsThreshold);
+      detectBoxes resVec;
+      NMS(yolobox_vec, resVec, m_nmsThreshold);
       for (auto& box : resVec){
           if (!agnostic){
               box.left -= box.classId * max_wh;
@@ -500,7 +518,7 @@ stateType sophgo_detect::yolov8Post(const bm_image* inputImages, std::vector<det
         int box_num = output_tensor->get_shape()->dims[1];
 
         #if USE_MULTICLASS_NMS
-            int out_nout = m_nout - 1;
+            int out_nout = m_nout;
         #else
             int out_nout = 7;
         #endif
@@ -514,28 +532,28 @@ stateType sophgo_detect::yolov8Post(const bm_image* inputImages, std::vector<det
                     float confidence = batch_output_data[j + 4];
                     int class_id = j;
                     if (confidence > m_confThreshold) {
-                        center_x = batch_output_data[0];
-                        center_y = batch_output_data[1];
-                        width = batch_output_data[2];
-                        height = batch_output_data[3];
-                    }
-                    detectBox box;
-
-                    box.left = center_x - width / 2;
-                    box.top = center_y - height / 2;
-                    box.right = box.left + width;
-                    box.bottom = box.top + height;  
-                    box.classId = class_id;
-                    box.score = confidence;
-
-                    if (!agnostic) {
-                        box.left += class_id * max_wh;
-                        box.top += class_id * max_wh;
-                        box.right += class_id * max_wh;
-                        box.bottom += class_id * max_wh;
-                    }
-                    yolobox_vec.push_back(box);
+                        float center_x = batch_output_data[0];
+                        float center_y = batch_output_data[1];
+                        float width = batch_output_data[2];
+                        float height = batch_output_data[3];
                     
+                        detectBox box;
+
+                        box.left = center_x - width / 2;
+                        box.top = center_y - height / 2;
+                        box.right = box.left + width;
+                        box.bottom = box.top + height;  
+                        box.classId = class_id;
+                        box.score = confidence;
+
+                        if (!agnostic) {
+                            box.left += class_id * max_wh;
+                            box.top += class_id * max_wh;
+                            box.right += class_id * max_wh;
+                            box.bottom += class_id * max_wh;
+                        }
+                        yolobox_vec.push_back(box);
+                    }
                 }
             #else
                 int class_id = argmax(batch_output_data + 4, m_class_num);
@@ -563,9 +581,8 @@ stateType sophgo_detect::yolov8Post(const bm_image* inputImages, std::vector<det
 
                     yolobox_vec.push_back(box);
                 }
-                batch_output_data += m_nout;
-        
             #endif
+            batch_output_data += m_nout;
         }
 
         detectBoxes resVec;
