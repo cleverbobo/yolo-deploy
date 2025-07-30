@@ -64,6 +64,9 @@ if (${TARGET_ARCH} STREQUAL "sophgo")
     checkAndAddElement(sample/Seg/sophgo)
     add_dependencies(segment_sophgo.run segment)
 
+    checkAndAddElement(sample/sophgo)
+    add_dependencies(yolo_sophgo.run segment detect)
+
 elseif(${TARGET_ARCH} STREQUAL "tensorrt")
     checkAndAddSample(sample/Det/tensorrt)
     add_dependencies(detect_tensorrt.run detect)
