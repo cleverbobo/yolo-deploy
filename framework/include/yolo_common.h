@@ -174,6 +174,33 @@ struct segmentBox {
 };
 using segmentBoxes = std::vector<segmentBox>;
 
+struct keypoint {
+    int x, y; // 关键点坐标
+    float visibility; // 可见性，0表示不可见，1表示可见
+};
+
+struct poseBox {
+    // 左上角坐标
+    int left, top;
+
+    // 右下角坐标
+    int right, bottom;
+
+    // 宽，高
+    int width, height;
+
+    // 置信度
+    float score;
+
+    // 兼容性
+    int classId = 0;
+
+    // 关键点
+    std::vector<keypoint> keypoints;
+
+};
+using poseBoxes = std::vector<poseBox>;
+
 
 // 输出的数据格式
 enum class INPUTTYPE{

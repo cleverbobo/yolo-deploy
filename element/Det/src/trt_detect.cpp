@@ -2,7 +2,7 @@
 #include "utils.h"
 
 // debug
-#ifdef YOLO_DEBUG
+#ifdef _DEBUG
 #include <cnpy.h>
 #endif
 

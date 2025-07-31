@@ -53,7 +53,8 @@ checkAndAddElement(element/Seg)
 add_dependencies(segment utils)
 
 
-# checkAndAddElement(element/Pose)
+checkAndAddElement(element/Pose)
+add_dependencies(pose utils)
 
 
 
@@ -64,6 +65,9 @@ if (${TARGET_ARCH} STREQUAL "sophgo")
     checkAndAddElement(sample/Seg/sophgo)
     add_dependencies(segment_sophgo.run segment)
 
+    checkAndAddElement(sample/Pose/sophgo)
+    add_dependencies(pose_sophgo.run pose)
+
     checkAndAddElement(sample/sophgo)
     add_dependencies(yolo_sophgo.run segment detect)
 
@@ -73,6 +77,9 @@ elseif(${TARGET_ARCH} STREQUAL "tensorrt")
 
     checkAndAddElement(sample/Seg/tensorrt)
     add_dependencies(segment_tensorrt.run segment)
+
+    checkAndAddElement(sample/Pose/tensorrt)
+    add_dependencies(pose_tensorrt.run pose)
 
 endif()
 

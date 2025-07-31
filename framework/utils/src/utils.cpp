@@ -207,6 +207,73 @@ void drawSegmentation(const segmentBoxes& boxes, cv::Mat& img, std::string outpu
     }
 }
 
+
+void drawPoseBox(poseBoxes& boxes, cv::Mat& img, std::string outputName, std::string outputDirPath) {
+    std::vector<std::pair<int, int>> skeleton = {
+                                                    {0,1}, {0,2}, {1,3}, {2,4}, {0,5}, {0,6},
+                                                    {5,6}, {5,7}, {7,9}, {6,8}, {8,10}, {5,11}, 
+                                                    {6,12}, {11,12}, {11,13}, {13,15}, {12,14}, {14,16}
+                                                };
+    // 遍历所有检测框
+    for (const auto& box : boxes) {
+        auto color = getColor(0);
+        // 绘制矩形框
+        cv::rectangle(img, cv::Point(box.left, box.top), cv::Point(box.right, box.bottom), color, 2);
+
+        // 准备标签内容
+        char label[100];
+        std::string className = "person"; // 假设只有一个类别
+        snprintf(label, sizeof(label), "%s: %.2f", className.c_str(), box.score);
+
+        // 计算文本尺寸
+        int baseline = 0;
+        cv::Size textSize = cv::getTextSize(label, cv::FONT_HERSHEY_SIMPLEX, 0.5, 1, &baseline);
+
+        // 绘制标签背景
+        cv::rectangle(img,
+                      cv::Point(box.left, box.top - textSize.height - baseline),
+                      cv::Point(box.left + textSize.width, box.top),
+                      color, cv::FILLED);
+
+        // 绘制标签文本
+        cv::putText(img, label, cv::Point(box.left, box.top - baseline),
+                    cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 0), 1);
+
+        // 绘制关键点
+        std::vector<int> keyPointIdx;
+        for (int i = 0; i < box.keypoints.size(); ++i) {
+            auto& kp = box.keypoints[i];
+            if (kp.visibility > 0) { // 只绘制可见的关键点
+                cv::circle(img, cv::Point(kp.x, kp.y), 3, color, -1); // 绘制实心圆
+                keyPointIdx.push_back(i); // 记录可见关键点的索引
+            }
+        }
+        // 根据可见关键点的索引绘制连线
+        for (const auto& pair : skeleton) {
+            int idx1 = pair.first;
+            int idx2 = pair.second;
+            // 检查这两个关键点是否都可见
+            if (std::find(keyPointIdx.begin(), keyPointIdx.end(), idx1) != keyPointIdx.end() &&
+                std::find(keyPointIdx.begin(), keyPointIdx.end(), idx2) != keyPointIdx.end()) {
+                cv::line(img, 
+                         cv::Point(box.keypoints[idx1].x, box.keypoints[idx1].y), 
+                         cv::Point(box.keypoints[idx2].x, box.keypoints[idx2].y), 
+                         color, 2);
+            }
+        }
+    }
+
+    // 保存或显示图片    
+    if (access(outputDirPath.c_str(), 0) != F_OK)
+        mkdir(outputDirPath.c_str(), S_IRWXU);
+    auto outputPath = outputDirPath + "/" + outputName;
+
+    if (!cv::imwrite(outputPath, img)) {
+        std::cerr << "无法保存图片到: " << outputPath << std::endl;
+    }
+    
+}
+
 // json functions
 
 void jsonDump(std::string jsonPath, nlohmann::ordered_json& jsonObj){
