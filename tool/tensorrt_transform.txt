@@ -1,0 +1,26 @@
+
+Detect
+
+polygraphy convert yolov5s_v6.1_3output.onnx --fp16 --input-shapes images:[1,3,640,640] -o yolov5s_v6.1_3output.engine
+
+polygraphy convert yolov6s.onnx --fp16 --input-shapes images:[1,3,640,640] -o yolov6s_f16_1b.engine
+
+polygraphy convert yolov8s.onnx --fp16 --input-shapes images:[1,3,640,640] -o yolov8s_f16_1b.engine
+
+polygraphy convert yolov10s.onnx --fp16 --input-shapes images:[1,3,640,640] -o yolov10s_f16_1b.engine
+
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+
+# segment
+polygraphy convert yolov5s-3out-seg.onnx --fp16 --input-shapes images:[1,3,640,640]  -o yolov5s_seg_f16_1b.engine
+
+polygraphy convert yolov6s_seg.onnx --fp16 --input-shapes images:[1,3,640,640] -o yolov6s_seg_f16_1b.engine
+
+polygraphy convert yolov8s-seg.onnx --fp16 --input-shapes images:[1,3,640,640] -o yolov8s_seg_f16_1b.engine
+
+--------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------------------------
+
+# pose
+polygraphy convert yolov8s-pose_transpose.onnx --fp16 --input-shapes images:[1,3,640,640] -o yolov8s_pose_f16_1b.engine
